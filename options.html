@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能收藏夹设置</title>
+  <style>
+    body {
+      width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+    }
+    .header {
+      margin-bottom: 20px;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+    .section {
+      margin-bottom: 30px;
+      padding: 20px;
+      border-radius: 8px;
+      background: #f5f5f5;
+    }
+    button {
+      padding: 8px 12px;
+      background: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #3367d6;
+    }
+    .delete-btn {
+        background: none !important;
+        border: none;
+        color: #dc3545;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 0;
+        margin-left: 10px;
+        margin-top: 2px;
+    }
+    .tabs {
+      display: flex;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    .tab {
+      padding: 8px 15px;
+      cursor: pointer;
+    }
+    .tab.active {
+      border-bottom: 2px solid #4285f4;
+      font-weight: bold;
+    }
+    .bookmark-list {
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .bookmark-item {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: flex-start;
+    }
+    .favicon {
+        width: 16px;
+        height: 16px;
+        margin-right: 10px;
+        flex-shrink: 0;
+    }
+    
+    /* 确保图标可见并调整位置 */
+    .delete-btn svg {
+        display: block;
+        width: 16px;
+        height: 16px;
+        position: relative;
+        top: 3px; /* 微调位置 */
+    }
+    .bookmark-info {
+      flex: 1;
+      overflow: hidden;
+    }
+    .bookmark-title {
+      font-weight: bold;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .bookmark-url {
+      font-size: 12px;
+      color: #666;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .clickable {
+      cursor: pointer;
+      color: #4285f4;
+      transition: opacity 0.2s;
+    }
+    .clickable:hover {
+      opacity: 0.8;
+      text-decoration: underline;
+    }
+    .bookmark-date {
+      font-size: 11px;
+      color: #999;
+    }
+    .star {
+      color: #ccc;
+      cursor: pointer;
+      margin: 0 10px;
+      font-size: 18px;
+    }
+    .star.starred {
+      color: gold;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 30px;
+      color: #999;
+    }
+    .stats {
+      margin-bottom: 10px;
+      font-size: 14px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <h1>智能收藏夹设置</h1>
+  
+  <div class="section">
+    <button id="importBookmarks">导入浏览器收藏夹</button>
+  </div>
+  
+  <div class="section">
+    <div class="stats">
+      总收藏: <span id="totalCount">0</span> |
+      重点关注: <span id="starredCount">0</span>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="all">全部收藏</div>
+      <div class="tab" data-tab="starred">重点关注</div>
+    </div>
+    <div class="bookmark-list" id="bookmarkList">
+      <!-- 书签列表将通过JS动态填充 -->
+      <div class="empty-state">暂无收藏</div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
