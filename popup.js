@@ -83,6 +83,8 @@ function initPopup() {
       <div class="bookmark-info">
         <div class="bookmark-title clickable">${bookmark.title}</div>
         <div class="bookmark-url clickable">${bookmark.url}</div>
+        ${bookmark.category ? `<div class="bookmark-category">${bookmark.category}</div>` : ''}
+        ${bookmark.summary ? `<div class="bookmark-summary">${bookmark.summary}</div>` : ''}
         <div class="bookmark-date">${formatDate(bookmark.dateAdded)}</div>
       </div>
       <div class="star ${bookmark.isStarred ? 'starred' : ''}"

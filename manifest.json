@@ -3,7 +3,12 @@
   "name": "智能网页收藏夹",
   "version": "1.0",
   "description": "增强型网页收藏管理工具",
-  "permissions": ["tabs", "bookmarks", "storage"],
+  "permissions": ["tabs", "bookmarks", "storage", "scripting", "activeTab"],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "https://api.deepseek.com/*",
+    "<all_urls>"
+  ],
   "action": {
     "default_popup": "popup.html"
   },

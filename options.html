@@ -132,6 +132,65 @@
       font-size: 14px;
       color: #666;
     }
+    .config-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .close-btn {
+      background: none;
+      color: #666;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 5px;
+      line-height: 1;
+      transition: all 0.2s;
+    }
+    .close-btn:hover {
+      color: #333;
+      transform: scale(1.1);
+    }
+    .input-group {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .input-group label {
+      width: 120px;
+      text-align: right;
+      margin-right: 10px;
+    }
+    .input-group input, 
+    .input-group select {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    /* 统一配置表单样式 */
+    .config-form {
+      margin-top: 15px;
+    }
+    .config-form .input-group {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .config-form .input-group label {
+      width: 120px;
+      text-align: right;
+      margin-right: 10px;
+      line-height: 36px;
+    }
+    .config-form .input-group input,
+    .config-form .input-group select {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -139,6 +198,61 @@
   
   <div class="section">
     <button id="importBookmarks">导入浏览器收藏夹</button>
+    <button id="toggleAIConfig">AI配置</button>
+  </div>
+  <div class="section" id="aiConfigSection" style="display:none">
+    <div class="config-header">
+      <h2>AI 配置</h2>
+      <button id="closeAIConfig" class="close-btn" title="关闭">&times;</button>
+    </div>
+    
+    <!-- 合并后的配置表单 -->
+    <div class="config-form">
+      <div class="input-group">
+        <label for="aiProvider">AI服务提供商：</label>
+        <select id="aiProvider">
+          <option value="openai">OpenAI</option>
+          <option value="deepseek">DeepSeek</option>
+        </select>
+      </div>
+      
+      <!-- OpenAI配置 -->
+      <div id="openaiConfig">
+        <div class="input-group">
+          <label for="openaiKey">API密钥：</label>
+          <input type="password" id="openaiKey" placeholder="sk-xxxxxxxxxxxxxxxx">
+        </div>
+        <div class="input-group">
+          <label for="openaiModel">模型：</label>
+          <select id="openaiModel">
+            <option value="gpt-4o">GPT-4o</option>
+            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- DeepSeek配置 -->
+      <div id="deepseekConfig" style="display:none">
+        <div class="input-group">
+          <label for="deepseekKey">API密钥：</label>
+          <input type="password" id="deepseekKey" placeholder="sk-xxxxxxxxxxxxxxxx">
+        </div>
+        <div class="input-group">
+          <label for="deepseekModel">模型：</label>
+          <select id="deepseekModel">
+            <option value="deepseek-chat">DeepSeek Chat</option>
+            <option value="deepseek-coder">DeepSeek Coder</option>
+            <option value="deepseek-reasoner">DeepSeek Reasoner</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- 添加保存按钮 -->
+      <div class="input-group" style="justify-content: flex-end; margin-top: 15px;">
+        <button id="saveAIConfig">保存配置</button>
+      </div>
+    </div>
   </div>
   
   <div class="section">

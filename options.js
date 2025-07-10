@@ -14,11 +14,83 @@ function initOptions() {
   importBtn.addEventListener('click', handleImportBookmarks);
   tabs.forEach(tab => tab.addEventListener('click', handleTabSwitch));
   
+  // AI配置相关事件绑定
+  document.getElementById('toggleAIConfig').addEventListener('click', function() {
+    document.getElementById('aiConfigSection').style.display = 'block';
+  });
+  
+  document.getElementById('closeAIConfig').addEventListener('click', function() {
+    document.getElementById('aiConfigSection').style.display = 'none';
+  });
+  
+  document.getElementById('aiProvider').addEventListener('change', handleProviderChange);
+  
   // 初始化数据加载
   loadBookmarks();
   
   // 监听存储变化
   chrome.storage.onChanged.addListener(handleStorageChange);
+  
+  // 处理提供商切换
+  function handleProviderChange() {
+    const provider = aiProvider.value;
+    // 显式设置所有配置区域的显示状态
+    document.getElementById('openaiConfig').style.display =
+      provider === 'openai' ? 'block' : 'none';
+    document.getElementById('deepseekConfig').style.display =
+      provider === 'deepseek' ? 'block' : 'none';
+  }
+  
+  // 保存AI配置
+  function saveAIConfig() {
+    const provider = document.getElementById('aiProvider').value;
+    const openaiKey = document.getElementById('openaiKey').value;
+    const deepseekKey = document.getElementById('deepseekKey').value;
+    
+    // 简单验证配置
+    if (!openaiKey && !deepseekKey) {
+      showToast('请至少配置一个API密钥', 2000, '#ff4444');
+      return;
+    }
+    
+    const config = {
+      provider: provider,
+      apiKey: provider === 'openai' ? openaiKey : deepseekKey,
+      model: provider === 'openai'
+        ? document.getElementById('openaiModel').value
+        : document.getElementById('deepseekModel').value
+    };
+    
+    chrome.storage.local.set({ aiConfig: config }, () => {
+      showToast('AI设置已保存');
+    });
+  }
+  
+  // 加载AI配置
+  function loadAIConfig() {
+    chrome.storage.local.get('aiConfig', (data) => {
+      const config = data.aiConfig || {};
+      
+      // 设置提供商
+      if (config.provider) {
+        aiProvider.value = config.provider;
+      }
+      
+      // 设置API密钥和模型
+      if (config.apiKey) {
+        if (config.provider === 'openai') {
+          document.getElementById('openaiKey').value = config.apiKey;
+          document.getElementById('openaiModel').value = config.model || 'gpt-4o';
+        } else {
+          document.getElementById('deepseekKey').value = config.apiKey;
+          document.getElementById('deepseekModel').value = config.model || 'deepseek-chat';
+        }
+      }
+      
+      // 触发切换事件
+      handleProviderChange();
+    });
+  }
 
   // 处理导入收藏夹
   function handleImportBookmarks() {
@@ -94,6 +166,9 @@ function initOptions() {
   }
 
   // 处理星标切换
+  // 绑定保存按钮事件
+  document.getElementById('saveAIConfig').addEventListener('click', saveAIConfig);
+  
   // 初始化事件委托
   bookmarkList.addEventListener('click', event => {
     // 处理星标点击
@@ -122,6 +197,9 @@ function initOptions() {
       return;
     }
   });
+  
+  // 初始化AI配置
+  loadAIConfig();
 
   function handleStarToggle(star) {
     const id = parseFloat(star.dataset.id);
@@ -228,4 +306,7 @@ function initOptions() {
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), duration);
   }
+  
+  // 初始化显示状态
+  handleProviderChange();
 }
