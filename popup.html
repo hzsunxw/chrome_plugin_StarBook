@@ -103,6 +103,34 @@
       color: #999;
       margin-top: 3px;
     }
+    /* AI状态样式 */
+    .ai-status {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      margin-top: 2px;
+    }
+    .status-icon {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .status-processing {
+      background: #4285f4;
+      animation: pulse 1.5s infinite;
+    }
+    .status-completed {
+      background: #34a853;
+    }
+    .status-failed {
+      background: #ea4335;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.6; }
+      50% { opacity: 1; }
+      100% { opacity: 0.6; }
+    }
     .star {
       color: #ccc;
       cursor: pointer;
@@ -131,7 +159,23 @@
   </div>
 
   <div class="bookmark-list" id="bookmarkList">
-    <!-- 书签列表将通过JS动态填充 -->
+    <!-- 书签列表模板 -->
+    <template id="bookmarkTemplate">
+      <div class="bookmark-item">
+        <div class="bookmark-info">
+          <div class="bookmark-title">{{title}}</div>
+          <div class="bookmark-url">{{url}}</div>
+          <div class="bookmark-category">{{category}}</div>
+          <div class="bookmark-summary">{{summary}}</div>
+          <div class="bookmark-date">{{date}}</div>
+          <div class="ai-status" data-status="{{aiStatus}}">
+            <div class="status-icon"></div>
+            <span class="status-text">{{aiError}}</span>
+          </div>
+        </div>
+        <div class="star" data-id="{{id}}">★</div>
+      </div>
+    </template>
     <div class="empty-state">暂无收藏</div>
   </div>
 

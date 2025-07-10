@@ -9,36 +9,73 @@ function initOptions() {
   const importBtn = document.getElementById('importBookmarks');
   const tabs = document.querySelectorAll('.tab');
   const bookmarkList = document.getElementById('bookmarkList');
+  const aiProvider = document.getElementById('aiProvider');
 
-  // 事件监听
+  // --- 事件监听 ---
   importBtn.addEventListener('click', handleImportBookmarks);
   tabs.forEach(tab => tab.addEventListener('click', handleTabSwitch));
   
   // AI配置相关事件绑定
-  document.getElementById('toggleAIConfig').addEventListener('click', function() {
+  document.getElementById('toggleAIConfig').addEventListener('click', () => {
     document.getElementById('aiConfigSection').style.display = 'block';
   });
   
-  document.getElementById('closeAIConfig').addEventListener('click', function() {
+  document.getElementById('closeAIConfig').addEventListener('click', () => {
     document.getElementById('aiConfigSection').style.display = 'none';
   });
   
-  document.getElementById('aiProvider').addEventListener('change', handleProviderChange);
-  
+  aiProvider.addEventListener('change', handleProviderChange);
+  document.getElementById('saveAIConfig').addEventListener('click', saveAIConfig);
+
+  // 使用事件委托处理书签列表的点击事件
+  bookmarkList.addEventListener('click', handleListClick);
+
   // 初始化数据加载
   loadBookmarks();
+  loadAIConfig();
   
   // 监听存储变化
   chrome.storage.onChanged.addListener(handleStorageChange);
   
+  // --- 事件处理函数 ---
+
+  // 处理书签列表的集中点击事件
+  function handleListClick(event) {
+    const target = event.target;
+
+    // 处理星标点击
+    const star = target.closest('.star');
+    if (star) {
+      // 修复: ID是字符串，不应使用 parseFloat
+      const id = star.dataset.id;
+      handleStarToggle(id, star);
+      return;
+    }
+    
+    // 处理删除点击
+    const deleteBtn = target.closest('.delete-btn');
+    if (deleteBtn) {
+      // 修复: ID是字符串，不应使用 parseFloat
+      const id = deleteBtn.dataset.id;
+      handleDeleteBookmark(id, deleteBtn);
+      return;
+    }
+    
+    // 处理标题/URL点击
+    const clickable = target.closest('.clickable');
+    if (clickable) {
+      const url = clickable.dataset.url;
+      if (url) {
+        chrome.tabs.create({ url: url });
+      }
+    }
+  }
+
   // 处理提供商切换
   function handleProviderChange() {
     const provider = aiProvider.value;
-    // 显式设置所有配置区域的显示状态
-    document.getElementById('openaiConfig').style.display =
-      provider === 'openai' ? 'block' : 'none';
-    document.getElementById('deepseekConfig').style.display =
-      provider === 'deepseek' ? 'block' : 'none';
+    document.getElementById('openaiConfig').style.display = provider === 'openai' ? 'block' : 'none';
+    document.getElementById('deepseekConfig').style.display = provider === 'deepseek' ? 'block' : 'none';
   }
   
   // 保存AI配置
@@ -46,12 +83,6 @@ function initOptions() {
     const provider = document.getElementById('aiProvider').value;
     const openaiKey = document.getElementById('openaiKey').value;
     const deepseekKey = document.getElementById('deepseekKey').value;
-    
-    // 简单验证配置
-    if (!openaiKey && !deepseekKey) {
-      showToast('请至少配置一个API密钥', 2000, '#ff4444');
-      return;
-    }
     
     const config = {
       provider: provider,
@@ -70,47 +101,100 @@ function initOptions() {
   function loadAIConfig() {
     chrome.storage.local.get('aiConfig', (data) => {
       const config = data.aiConfig || {};
-      
-      // 设置提供商
       if (config.provider) {
         aiProvider.value = config.provider;
       }
       
-      // 设置API密钥和模型
-      if (config.apiKey) {
-        if (config.provider === 'openai') {
-          document.getElementById('openaiKey').value = config.apiKey;
-          document.getElementById('openaiModel').value = config.model || 'gpt-4o';
-        } else {
-          document.getElementById('deepseekKey').value = config.apiKey;
-          document.getElementById('deepseekModel').value = config.model || 'deepseek-chat';
-        }
+      if (config.provider === 'openai') {
+        document.getElementById('openaiKey').value = config.apiKey || '';
+        document.getElementById('openaiModel').value = config.model || 'gpt-4o';
+      } else {
+        document.getElementById('deepseekKey').value = config.apiKey || '';
+        document.getElementById('deepseekModel').value = config.model || 'deepseek-chat';
       }
       
-      // 触发切换事件
       handleProviderChange();
     });
   }
 
   // 处理导入收藏夹
   function handleImportBookmarks() {
-    chrome.runtime.sendMessage(
-      { action: "importBrowserBookmarks" },
-      response => {
+    chrome.runtime.sendMessage({ action: "importBrowserBookmarks" }, response => {
+      if (chrome.runtime.lastError) {
+        console.error('导入失败:', chrome.runtime.lastError);
+        showToast("导入失败，请重试", 2000, "#ff4444");
+        return;
+      }
+      if (response?.count > 0) {
+        showToast(`成功导入 ${response.count} 个书签`);
+        // loadBookmarks() 会被 storage.onChanged 触发，无需手动调用
+      } else if (response?.count === 0) {
+        showToast("没有新书签可导入");
+      }
+    });
+  }
+
+  // 处理星标切换
+  function handleStarToggle(id, starElement) {
+    chrome.runtime.sendMessage({
+      action: "toggleStar",
+      id: id
+    }, response => {
+      if (chrome.runtime.lastError) {
+        console.error('切换星标失败:', chrome.runtime.lastError);
+        showToast("操作失败，请重试", 2000, "#ff4444");
+        return;
+      }
+      if (response?.status === "success") {
+        // 优化: 根据后台返回的真实状态更新UI
+        starElement.classList.toggle('starred', response.isStarred);
+        // 更新统计
+        updateStats(); 
+        // 如果在“重点关注”标签页，且取消了星标，则移除该项
+        if (currentTab === 'starred' && !response.isStarred) {
+            starElement.closest('.bookmark-item').remove();
+        }
+      } else {
+        showToast(response?.message || "书签不存在", 2000, "#ff4444");
+      }
+    });
+  }
+
+  // 处理删除书签
+  function handleDeleteBookmark(id, button) {
+    if (confirm('确定要删除这个书签吗？')) {
+      chrome.runtime.sendMessage({ action: "deleteBookmark", id: id }, response => {
         if (chrome.runtime.lastError) {
-          console.error('导入失败:', chrome.runtime.lastError);
-          showToast("导入失败，请重试", 2000, "#ff4444");
+          console.error('删除失败:', chrome.runtime.lastError);
+          showToast("删除失败，请重试", 2000, "#ff4444");
           return;
         }
-        if (response?.count > 0) {
-          showToast(`成功导入 ${response.count} 个书签`);
-          loadBookmarks();
-        } else if (response?.count === 0) {
-          showToast("没有新书签可导入，所有书签均已存在");
+        if (response?.status === "success") {
+          showToast("书签已删除");
+          // 优化: 直接从DOM中移除元素，而不是重新加载所有
+          button.closest('.bookmark-item').remove();
+          // 更新本地数据和统计
+          bookmarks = bookmarks.filter(b => b.id !== id);
+          updateStats();
+        } else {
+          showToast(response?.message || "书签不存在", 2000, "#ff4444");
         }
-      }
-    );
+      });
+    }
   }
+
+  // 处理选项卡切换
+  function handleTabSwitch(event) {
+    const tab = event.target;
+    if (tab.classList.contains('active')) return;
+
+    tabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentTab = tab.dataset.tab;
+    renderBookmarks();
+  }
+
+  // --- 数据和渲染 ---
 
   // 加载书签数据
   function loadBookmarks() {
@@ -149,14 +233,13 @@ function initOptions() {
     div.innerHTML = `
       <img class="favicon" src="${faviconUrl}" width="16" height="16" loading="lazy" alt="">
       <div class="bookmark-info">
-        <div class="bookmark-title clickable">${bookmark.title}</div>
-        <div class="bookmark-url clickable">${bookmark.url}</div>
+        <div class="bookmark-title clickable" data-url="${bookmark.url}">${bookmark.title}</div>
+        <div class="bookmark-url clickable" data-url="${bookmark.url}">${bookmark.url}</div>
         <div class="bookmark-date">${formatDate(bookmark.dateAdded)}</div>
       </div>
-      <div class="star ${bookmark.isStarred ? 'starred' : ''}"
-           data-id="${bookmark.id}">★</div>
+      <div class="star ${bookmark.isStarred ? 'starred' : ''}" data-id="${bookmark.id}">★</div>
       <button class="delete-btn" data-id="${bookmark.id}" aria-label="删除">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#dc3545">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path d="M3 6v18h18v-18h-18zm5 14c0 .552-.448 1-1 1s-1-.448-1-1v-10c0-.552.448-1 1-1s1 .448 1 1v10zm5 0c0 .552-.448 1-1 1s-1-.448-1-1v-10c0-.552.448-1 1-1s1 .448 1 1v10zm5 0c0 .552-.448 1-1 1s-1-.448-1-1v-10c0-.552.448-1 1-1s1 .448 1 1v10zm4-18v2h-20v-2h5.711c.9 0 1.631-1.099 1.631-2h5.315c0 .901.73 2 1.631 2h5.712z"/>
         </svg>
       </button>
@@ -165,101 +248,10 @@ function initOptions() {
     return div;
   }
 
-  // 处理星标切换
-  // 绑定保存按钮事件
-  document.getElementById('saveAIConfig').addEventListener('click', saveAIConfig);
-  
-  // 初始化事件委托
-  bookmarkList.addEventListener('click', event => {
-    // 处理星标点击
-    const star = event.target.closest('.star');
-    if (star) {
-      handleStarToggle(star);
-      return;
-    }
-    
-    // 处理删除点击
-    const deleteBtn = event.target.closest('.delete-btn');
-    if (deleteBtn) {
-      handleDeleteBookmark(deleteBtn);
-      return;
-    }
-    
-    // 处理标题/URL点击
-    const clickable = event.target.closest('.clickable');
-    if (clickable) {
-      const bookmarkItem = event.target.closest('.bookmark-item');
-      const id = parseFloat(bookmarkItem.querySelector('.star').dataset.id);
-      const bookmark = bookmarks.find(b => b.id === id);
-      if (bookmark) {
-        chrome.tabs.create({ url: bookmark.url });
-      }
-      return;
-    }
-  });
-  
-  // 初始化AI配置
-  loadAIConfig();
-
-  function handleStarToggle(star) {
-    const id = parseFloat(star.dataset.id);
-    
-    chrome.runtime.sendMessage({
-      action: "toggleStar",
-      id: id
-    }, response => {
-      if (chrome.runtime.lastError) {
-        console.error('切换星标失败:', chrome.runtime.lastError);
-        showToast("操作失败，请重试", 2000, "#ff4444");
-        return;
-      }
-      if (response?.status === "success") {
-        star.classList.toggle('starred');
-      } else if (response?.status === "not_found") {
-        showToast("书签不存在", 2000, "#ff4444");
-      }
-    });
-  }
-
-  // 处理删除书签
-  function handleDeleteBookmark(button) {
-    const id = parseFloat(button.dataset.id);
-    if (confirm('确定要删除这个书签吗？')) {
-      chrome.runtime.sendMessage({
-        action: "deleteBookmark",
-        id: id
-      }, response => {
-        if (chrome.runtime.lastError) {
-          console.error('删除失败:', chrome.runtime.lastError);
-          showToast("删除失败，请重试", 2000, "#ff4444");
-          return;
-        }
-        if (response?.status === "success") {
-          showToast("书签已删除");
-          loadBookmarks();
-        } else if (response?.status === "not_found") {
-          showToast("书签不存在", 2000, "#ff4444");
-        }
-      });
-    }
-  }
-
-  // 处理选项卡切换
-  function handleTabSwitch(event) {
-    const tab = event.target;
-    if (tab.classList.contains('active')) return;
-
-    tabs.forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    currentTab = tab.dataset.tab;
-    renderBookmarks();
-    updateStats();
-  }
-
   // 处理存储变化
   function handleStorageChange(changes) {
     if (changes.bookmarks) {
-      bookmarks = changes.bookmarks.newValue;
+      bookmarks = changes.bookmarks.newValue || [];
       renderBookmarks();
       updateStats();
     }
@@ -271,23 +263,22 @@ function initOptions() {
     document.getElementById('starredCount').textContent = bookmarks.filter(b => b.isStarred).length;
   }
   
-  // 获取网站favicon
+  // --- 工具函数 ---
+
   function getFaviconUrl(url) {
     try {
       const domain = new URL(url).hostname;
       return `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
     } catch {
-      return 'icons/icon16.png'; // 默认图标
+      return 'icons/icon16.png';
     }
   }
 
-  // 工具函数：格式化日期
   function formatDate(isoString) {
     const date = new Date(isoString);
     return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
   }
 
-  // 工具函数：显示操作提示
   function showToast(message, duration=2000, color="#4285f4") {
     const toast = document.createElement('div');
     toast.textContent = message;
@@ -300,13 +291,11 @@ function initOptions() {
       color: 'white',
       padding: '10px 20px',
       borderRadius: '4px',
-      zIndex: 1000
+      zIndex: 1000,
+      textAlign: 'center'
     });
     
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), duration);
   }
-  
-  // 初始化显示状态
-  handleProviderChange();
 }
