@@ -1,14 +1,14 @@
-// 全局书签存储
-let bookmarks = [];
+// 全局书签存储（主要用于非关键性读取或缓存，但写操作不应依赖它）
+let bookmarksCache = [];
 
-// 初始化：从存储中加载书签
-chrome.runtime.onStartup.addListener(loadBookmarksFromStorage);
-chrome.runtime.onInstalled.addListener(loadBookmarksFromStorage);
+// 初始化：从存储中加载书签到缓存
+chrome.runtime.onStartup.addListener(loadBookmarksToCache);
+chrome.runtime.onInstalled.addListener(loadBookmarksToCache);
 
-function loadBookmarksFromStorage() {
+function loadBookmarksToCache() {
   chrome.storage.local.get("bookmarks", (data) => {
-    bookmarks = data.bookmarks || [];
-    console.log("Bookmarks loaded on startup:", bookmarks.length);
+    bookmarksCache = data.bookmarks || [];
+    console.log("Bookmarks loaded to cache:", bookmarksCache.length);
   });
 }
 
@@ -17,139 +17,121 @@ function generateBookmarkId() {
   return crypto.randomUUID();
 }
 
-// 统一书签操作服务
-const bookmarkService = {
-  add: (bookmarkData) => {
-    const newBookmark = {
-      ...bookmarkData,
-      id: generateBookmarkId(),
-      dateAdded: new Date().toISOString(),
-      isStarred: false,
-      category: '',
-      summary: '',
-      aiStatus: 'pending' // 'pending', 'processing', 'completed', 'failed'
-    };
-    bookmarks.unshift(newBookmark);
-    chrome.storage.local.set({ bookmarks });
-    return newBookmark;
-  },
+// 消息监听器
+// 关键改动：将回调函数声明为 async，以便内部可以使用 await
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  const { action, id } = request;
 
-  delete: (id) => {
-    return new Promise((resolve, reject) => {
+  // 使用立即执行的异步函数来处理逻辑
+  (async () => {
+    // 关键修复：对于任何修改操作，都先从 storage 读取最新数据
+    const { bookmarks = [] } = await chrome.storage.local.get("bookmarks");
+
+    if (action === "addCurrentPage") {
+      try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tabs[0] || !tabs[0].url || tabs[0].url.startsWith('chrome://')) {
+          sendResponse({ status: "error", message: "无法添加此类型的页面" });
+          return;
+        }
+
+        const tab = tabs[0];
+        if (bookmarks.some(b => b.url === tab.url)) {
+          sendResponse({ status: "duplicate" });
+          return;
+        }
+
+        const newBookmark = {
+          url: tab.url,
+          title: tab.title,
+          id: generateBookmarkId(),
+          dateAdded: new Date().toISOString(),
+          isStarred: false,
+          category: '',
+          summary: '',
+          aiStatus: 'pending' // 'pending', 'processing', 'completed', 'failed'
+        };
+
+        // 修改本地副本
+        const updatedBookmarks = [newBookmark, ...bookmarks];
+
+        // 将修改后的完整数据写回
+        await chrome.storage.local.set({ bookmarks: updatedBookmarks });
+        
+        sendResponse({ status: "success", bookmark: newBookmark });
+
+      } catch (e) {
+        console.error("Error adding current page:", e);
+        sendResponse({ status: "error", message: "操作失败" });
+      }
+    }
+
+    if (action === "deleteBookmark") {
       const index = bookmarks.findIndex(b => b.id === id);
       if (index !== -1) {
         bookmarks.splice(index, 1);
-        chrome.storage.local.set({ bookmarks }, () => {
-          chrome.runtime.lastError 
-            ? reject("存储更新失败") 
-            : resolve(true);
-        });
+        await chrome.storage.local.set({ bookmarks });
+        sendResponse({ status: "success" });
       } else {
-        reject("书签不存在");
+        sendResponse({ status: "error", message: "书签不存在" });
       }
-    });
-  },
+    }
 
-  toggleStar: (id) => {
-    return new Promise((resolve, reject) => {
+    if (action === "toggleStar") {
       const bookmark = bookmarks.find(b => b.id === id);
       if (bookmark) {
         bookmark.isStarred = !bookmark.isStarred;
-        chrome.storage.local.set({ bookmarks }, () => {
-          chrome.runtime.lastError 
-            ? reject("存储更新失败") 
-            : resolve(bookmark.isStarred); // 返回最新的状态
-        });
+        await chrome.storage.local.set({ bookmarks });
+        sendResponse({ status: "success", isStarred: bookmark.isStarred });
       } else {
-        reject("书签不存在");
+        sendResponse({ status: "error", message: "书签不存在" });
       }
-    });
-  },
+    }
 
-  update: (id, updates) => {
-      const index = bookmarks.findIndex(b => b.id === id);
-      if (index !== -1) {
-          bookmarks[index] = { ...bookmarks[index], ...updates, lastUpdated: new Date().toISOString() };
-          chrome.storage.local.set({ bookmarks });
-      }
-  }
-};
+    if (action === "importBrowserBookmarks") {
+        try {
+            const browserBookmarksTree = await chrome.bookmarks.getTree();
+            const newBookmarks = [];
+            
+            const flattenBookmarks = (nodes) => {
+                for (const node of nodes) {
+                    // 检查URL有效且在当前存储中不存在
+                    if (node.url && !bookmarks.some(b => b.url === node.url)) {
+                        newBookmarks.push({
+                            id: generateBookmarkId(),
+                            url: node.url,
+                            title: node.title || '无标题',
+                            dateAdded: new Date(node.dateAdded).toISOString(),
+                            isStarred: false,
+                            category: '',
+                            summary: ''
+                        });
+                    }
+                    if (node.children) {
+                        flattenBookmarks(node.children);
+                    }
+                }
+            };
+            
+            flattenBookmarks(browserBookmarksTree);
 
-// 消息监听器
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  const action = request.action;
-  
-  if (action === "addCurrentPage") {
-    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-      if (!tabs[0] || !tabs[0].url || tabs[0].url.startsWith('chrome://')) {
-        sendResponse({status: "error", message: "无法添加此类型的页面"});
-        return;
-      }
+            if (newBookmarks.length > 0) {
+                const updatedBookmarks = [...newBookmarks, ...bookmarks];
+                await chrome.storage.local.set({ bookmarks: updatedBookmarks });
+                sendResponse({ status: "success", count: newBookmarks.length });
+            } else {
+                sendResponse({ status: "success", count: 0 });
+            }
+        } catch (e) {
+            console.error("Error importing bookmarks:", e);
+            sendResponse({ status: "error", message: "导入失败" });
+        }
+    }
+  })();
 
-      const tab = tabs[0];
-      if (bookmarks.some(b => b.url === tab.url)) {
-        sendResponse({status: "duplicate"});
-        return;
-      }
-
-      const newBookmark = bookmarkService.add({ url: tab.url, title: tab.title });
-      sendResponse({status: "success", bookmark: newBookmark});
-
-      // 异步AI处理 (此处为占位逻辑，实际AI调用需实现)
-      // processBookmarkWithAI(newBookmark);
-    });
-    return true; // 异步需要返回true
-  }
-
-  if (action === "deleteBookmark") {
-    bookmarkService.delete(request.id)
-      .then(() => sendResponse({status: "success"}))
-      .catch(errorMsg => sendResponse({status: "error", message: errorMsg}));
-    return true;
-  }
-
-  if (action === "toggleStar") {
-    bookmarkService.toggleStar(request.id)
-      .then(newState => sendResponse({status: "success", isStarred: newState}))
-      .catch(errorMsg => sendResponse({status: "error", message: errorMsg}));
-    return true;
-  }
-
-  if (action === "importBrowserBookmarks") {
-    chrome.bookmarks.getTree((bookmarkTree) => {
-      const newBookmarks = [];
-      const flattenBookmarks = (nodes) => {
-        nodes.forEach(node => {
-          if (node.url && !bookmarks.some(b => b.url === node.url)) {
-            newBookmarks.push({
-              id: generateBookmarkId(),
-              url: node.url,
-              title: node.title || '无标题',
-              dateAdded: new Date(node.dateAdded).toISOString(),
-              isStarred: false,
-              category: '',
-              summary: ''
-            });
-          }
-          if (node.children) {
-            flattenBookmarks(node.children);
-          }
-        });
-      };
-
-      flattenBookmarks(bookmarkTree);
-      if (newBookmarks.length > 0) {
-        bookmarks = [...newBookmarks, ...bookmarks];
-        chrome.storage.local.set({bookmarks}, () => {
-          sendResponse({status: "success", count: newBookmarks.length});
-        });
-      } else {
-        sendResponse({status: "success", count: 0});
-      }
-    });
-    return true;
-  }
+  // 必须返回 true，因为我们使用了异步的 sendResponse
+  return true;
 });
 
-// 确保在background.js启动时加载一次书签
-loadBookmarksFromStorage();
+// 确保在background.js启动时加载一次书签到缓存
+loadBookmarksToCache();
