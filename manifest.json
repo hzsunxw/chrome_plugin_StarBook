@@ -3,7 +3,14 @@
   "name": "智能网页收藏夹",
   "version": "1.0",
   "description": "增强型网页收藏管理工具",
-  "permissions": ["tabs", "bookmarks", "storage", "scripting", "activeTab"],
+  "permissions": [
+    "tabs",
+    "bookmarks",
+    "storage",
+    "scripting",
+    "activeTab",
+    "offscreen"
+  ],
   "host_permissions": [
     "https://api.openai.com/*",
     "https://api.deepseek.com/*",
@@ -15,5 +22,9 @@
   "background": {
     "service_worker": "background.js"
   },
-  "options_page": "options.html"
+  "options_page": "options.html",
+  "offscreen": {
+    "reason": "DOM_PARSER",
+    "justification": "用于在后台解析HTML字符串"
+  }
 }
