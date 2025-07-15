@@ -1,64 +1,110 @@
-// --- 任务队列相关变量 ---
+// --- Task Queue ---
 let taskQueue = [];
 let isProcessingQueue = false;
 
-// 初始化监听器
+// --- Context Menu ID ---
+const CONTEXT_MENU_ID = "bookmark_this_page";
+
+// --- Lifecycle Events ---
 chrome.runtime.onInstalled.addListener(() => {
-    console.log("插件已安装或更新。");
+    console.log("Smart Bookmarker installed or updated.");
+    
+    // Set language on first install
+    chrome.storage.local.get('language', (data) => {
+        if (!data.language) {
+            const browserLang = chrome.i18n.getUILanguage();
+            const langToSet = browserLang.startsWith('zh') ? 'zh_CN' : 'en';
+            chrome.storage.local.set({ language: langToSet });
+        }
+    });
+
+    // --- Create Context Menu Item ---
+    chrome.contextMenus.create({
+        id: CONTEXT_MENU_ID,
+        title: chrome.i18n.getMessage("bookmarkThisPage"), // Use the new key
+        contexts: ["page"] // Show context menu on pages
+    });
 });
+
 chrome.runtime.onStartup.addListener(() => {
-    console.log("浏览器已启动。");
+    console.log("Browser started.");
+    setInterval(processTaskQueue, 60000);
+});
+
+// --- Context Menu Click Listener ---
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    if (info.menuItemId === CONTEXT_MENU_ID) {
+        // Check for duplicates before adding to the queue
+        const { bookmarks = [] } = await chrome.storage.local.get("bookmarks");
+        if (tab && tab.url && !tab.url.startsWith('chrome://') && !bookmarks.some(b => b.url === tab.url)) {
+            taskQueue.push(() => handleAsyncBookmarkAction('addCurrentPage', null, tab));
+            processTaskQueue();
+        } else {
+            console.log("Page already exists or is not valid. Not adding from context menu.");
+        }
+    }
 });
 
 
-// 消息监听器
+// --- Message Listener ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  const { action, id } = request;
-
   (async () => {
+    const { action, id } = request;
+
     if (action === "addCurrentPage" || action === "regenerateAiData") {
-        taskQueue.push(() => handleAsyncBookmarkAction(action, id, sender.tab?.id));
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const currentTab = tabs[0];
+        
+        if (action === 'addCurrentPage') {
+            const { bookmarks = [] } = await chrome.storage.local.get("bookmarks");
+            if (!currentTab || !currentTab.url || currentTab.url.startsWith('chrome://')) {
+                sendResponse({ status: "no_active_tab" });
+                return;
+            }
+            if (bookmarks.some(b => b.url === currentTab.url)) {
+                sendResponse({ status: "duplicate" });
+                return;
+            }
+        }
+
+        taskQueue.push(() => handleAsyncBookmarkAction(action, id, currentTab));
         processTaskQueue();
-        sendResponse({ status: "queued", message: "任务已加入处理队列" });
+        sendResponse({ status: "queued" });
         return;
     }
-
+    
     const { bookmarks = [] } = await chrome.storage.local.get("bookmarks");
+    const index = bookmarks.findIndex(b => b.id === id);
 
     if (action === "deleteBookmark") {
-      const index = bookmarks.findIndex(b => b.id === id);
       if (index !== -1) {
         bookmarks.splice(index, 1);
         await chrome.storage.local.set({ bookmarks });
         sendResponse({ status: "success" });
       } else {
-        sendResponse({ status: "error", message: "书签不存在" });
+        sendResponse({ status: "error", message: chrome.i18n.getMessage("bookmarkNotFound") });
       }
-    }
-
-    if (action === "toggleStar") {
-      const bookmark = bookmarks.find(b => b.id === id);
-      if (bookmark) {
-        bookmark.isStarred = !bookmark.isStarred;
+    } else if (action === "toggleStar") {
+      if (index !== -1) {
+        bookmarks[index].isStarred = !bookmarks[index].isStarred;
         await chrome.storage.local.set({ bookmarks });
-        sendResponse({ status: "success", isStarred: bookmark.isStarred });
+        sendResponse({ status: "success", isStarred: bookmarks[index].isStarred });
       } else {
-        sendResponse({ status: "error", message: "书签不存在" });
+        sendResponse({ status: "error", message: chrome.i18n.getMessage("bookmarkNotFound") });
       }
-    }
-
-    if (action === "importBrowserBookmarks") {
+    } else if (action === "importBrowserBookmarks") {
         try {
             const browserBookmarksTree = await chrome.bookmarks.getTree();
+            const { bookmarks: currentBookmarks = [] } = await chrome.storage.local.get("bookmarks");
             const newBookmarks = [];
             
             const flattenBookmarks = (nodes) => {
                 for (const node of nodes) {
-                    if (node.url && !bookmarks.some(b => b.url === node.url)) {
+                    if (node.url && !node.url.startsWith('javascript:') && !currentBookmarks.some(b => b.url === node.url)) {
                         newBookmarks.push({
                             id: crypto.randomUUID(),
                             url: node.url,
-                            title: node.title || '无标题',
+                            title: node.title || 'No Title',
                             dateAdded: new Date(node.dateAdded).toISOString(),
                             isStarred: false, category: '', summary: '', aiStatus: 'pending'
                         });
@@ -68,66 +114,52 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     }
                 }
             };
-            
             flattenBookmarks(browserBookmarksTree);
 
             if (newBookmarks.length > 0) {
-                const updatedBookmarks = [...newBookmarks, ...bookmarks];
+                const updatedBookmarks = [...newBookmarks, ...currentBookmarks];
                 await chrome.storage.local.set({ bookmarks: updatedBookmarks });
 
                 newBookmarks.forEach(bm => {
                     taskQueue.push(() => processBookmarkWithAI(bm.id, null));
                 });
                 processTaskQueue();
-
                 sendResponse({ status: "success", count: newBookmarks.length });
             } else {
                 sendResponse({ status: "success", count: 0 });
             }
         } catch (e) {
             console.error("Error importing bookmarks:", e);
-            sendResponse({ status: "error", message: "导入失败" });
+            sendResponse({ status: "error", message: chrome.i18n.getMessage("importFailed") });
         }
     }
   })();
-
-  return true;
+  return true; // Indicates async response
 });
 
-
-// --- 新增：处理队列的函数 ---
+// --- Task Processing ---
 async function processTaskQueue() {
-    if (isProcessingQueue || taskQueue.length === 0) {
-        return;
-    }
+    if (isProcessingQueue || taskQueue.length === 0) return;
     isProcessingQueue = true;
 
     const taskToRun = taskQueue.shift();
     try {
         await taskToRun();
     } catch (e) {
-        console.error("处理任务队列时发生错误:", e);
+        console.error("Error processing task queue:", e);
     }
 
     isProcessingQueue = false;
-    processTaskQueue();
+    setTimeout(processTaskQueue, 500); 
 }
 
-// 【新增】统一处理书签动作的函数
-async function handleAsyncBookmarkAction(action, id, tabId) {
+async function handleAsyncBookmarkAction(action, id, tab) {
     if (action === "addCurrentPage") {
         const { bookmarks = [] } = await chrome.storage.local.get("bookmarks");
-        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-        const tab = tabs[0];
-        if (!tab || !tab.url || tab.url.startsWith('chrome://')) return;
-        if (bookmarks.some(b => b.url === tab.url)) return;
-        
         const newBookmark = {
-          url: tab.url,
-          title: tab.title,
-          id: crypto.randomUUID(),
-          dateAdded: new Date().toISOString(),
-          isStarred: false, category: '', summary: '', aiStatus: 'pending'
+          url: tab.url, title: tab.title, id: crypto.randomUUID(),
+          dateAdded: new Date().toISOString(), isStarred: false, 
+          category: '', summary: '', aiStatus: 'pending'
         };
         const updatedBookmarks = [newBookmark, ...bookmarks];
         await chrome.storage.local.set({ bookmarks: updatedBookmarks });
@@ -138,41 +170,43 @@ async function handleAsyncBookmarkAction(action, id, tabId) {
     }
 }
 
-
-// --- AI处理核心逻辑 (现在由任务队列安全调用) ---
+// --- AI Core Logic ---
 async function processBookmarkWithAI(bookmarkId, tabId) {
-  let { bookmarks = [], aiConfig } = await chrome.storage.local.get(["bookmarks", "aiConfig"]);
-  const bookmarkIndex = bookmarks.findIndex(b => b.id === bookmarkId);
+  const updateStatus = async (status, error = '') => {
+      const { bookmarks = [] } = await chrome.storage.local.get("bookmarks");
+      const index = bookmarks.findIndex(b => b.id === bookmarkId);
+      if (index !== -1) {
+          bookmarks[index].aiStatus = status;
+          bookmarks[index].aiError = error;
+          await chrome.storage.local.set({ bookmarks });
+      }
+  };
 
-  if (bookmarkIndex === -1) {
-    console.error(`AI处理失败: 未找到ID为 ${bookmarkId} 的书签。`);
-    return;
-  }
-  
+  await updateStatus('processing');
+
+  const { aiConfig } = await chrome.storage.local.get("aiConfig");
   if (!aiConfig || !aiConfig.apiKey) {
-    bookmarks[bookmarkIndex].aiStatus = 'failed';
-    bookmarks[bookmarkIndex].aiError = 'AI未配置或API密钥缺失';
-    await chrome.storage.local.set({ bookmarks });
+    await updateStatus('failed', chrome.i18n.getMessage("errorMissingApiKey"));
     return;
   }
-
-  bookmarks[bookmarkIndex].aiStatus = 'processing';
-  await chrome.storage.local.set({ bookmarks });
 
   try {
-    const pageContent = await getPageContent(tabId, bookmarks[bookmarkIndex].url);
+    const { bookmarks } = await chrome.storage.local.get("bookmarks");
+    const bookmark = bookmarks.find(b => b.id === bookmarkId);
+    if (!bookmark) throw new Error("Bookmark disappeared during processing.");
+
+    const pageContent = await getPageContent(tabId, bookmark.url);
     if (!pageContent || pageContent.trim().length < 50) {
-        throw new Error("无法提取有效页面内容");
+        throw new Error(chrome.i18n.getMessage("errorContentExtraction"));
     }
 
     const aiResponseText = await callAI(aiConfig, pageContent);
-    
     const { summary, category } = parseAIResponse(aiResponseText);
     if (!summary && !category) {
-        throw new Error("AI未能按预期格式返回内容");
+        throw new Error(chrome.i18n.getMessage("errorAiResponseFormat"));
     }
     
-    let { bookmarks: finalBookmarks } = await chrome.storage.local.get("bookmarks");
+    const { bookmarks: finalBookmarks } = await chrome.storage.local.get("bookmarks");
     const finalIndex = finalBookmarks.findIndex(b => b.id === bookmarkId);
     if (finalIndex !== -1) {
         finalBookmarks[finalIndex].summary = summary;
@@ -181,16 +215,9 @@ async function processBookmarkWithAI(bookmarkId, tabId) {
         finalBookmarks[finalIndex].aiError = '';
         await chrome.storage.local.set({ bookmarks: finalBookmarks });
     }
-
   } catch (error) {
-    console.error(`AI处理书签 ${bookmarkId} 时出错:`, error);
-    let { bookmarks: errorBookmarks } = await chrome.storage.local.get("bookmarks");
-    const errorIndex = errorBookmarks.findIndex(b => b.id === bookmarkId);
-    if (errorIndex !== -1) {
-        errorBookmarks[errorIndex].aiStatus = 'failed';
-        errorBookmarks[errorIndex].aiError = error.message;
-        await chrome.storage.local.set({ bookmarks: errorBookmarks });
-    }
+    console.error(`AI processing error for bookmark ${bookmarkId}:`, error);
+    await updateStatus('failed', error.message);
   }
 }
 
@@ -205,50 +232,37 @@ async function getPageContent(tabId, url) {
                 return results[0].result;
             }
         } catch (e) {
-            console.warn(`向标签页 ${tabId} 注入脚本失败, 回退到 fetch 模式。`, e);
+            console.warn(`Script injection failed for tab ${tabId}, falling back to fetch.`, e);
         }
     }
-
     try {
         const response = await fetch(url);
-        if (!response.ok) throw new Error(`Fetch请求失败，状态码: ${response.status}`);
-        
+        if (!response.ok) throw new Error(`Fetch failed with status: ${response.status}`);
         const html = await response.text();
-        const textContent = await parseWithOffscreen(html);
-        return textContent;
-
+        return await parseWithOffscreen(html);
     } catch (fetchError) {
-        console.error("内容提取的 fetch 回退模式也失败了:", fetchError);
-        return null;
+        console.error("Content extraction via fetch also failed:", fetchError);
+        throw new Error(chrome.i18n.getMessage("errorContentExtraction"));
     }
 }
 
-// --- 离屏文档相关函数 ---
-async function hasOffscreenDocument(path) {
-    const offscreenUrl = chrome.runtime.getURL(path);
-    const clients = await self.clients.matchAll();
-    for (const client of clients) {
-        if (client.url === offscreenUrl) {
-            return true;
-        }
-    }
-    return false;
-}
-
+// --- Offscreen Document Logic ---
+let creating; 
 async function setupOffscreenDocument(path) {
-    if (await hasOffscreenDocument(path)) {
-        return;
-    }
-    
-    await chrome.offscreen.createDocument({
-        url: path,
-        reasons: ['DOM_PARSER'],
-        justification: '用于在后台解析HTML字符串',
-    }).catch(error => {
-        if (!error.message.startsWith('Only a single offscreen')) {
-            throw error;
-        }
+  const hasDoc = await chrome.offscreen.hasDocument();
+  if (hasDoc) return;
+
+  if (creating) {
+    await creating;
+  } else {
+    creating = chrome.offscreen.createDocument({
+      url: path,
+      reasons: [chrome.offscreen.Reason.DOM_PARSER],
+      justification: 'To parse HTML strings in the background service worker',
     });
+    await creating;
+    creating = null;
+  }
 }
 
 async function parseWithOffscreen(html) {
@@ -261,22 +275,26 @@ async function parseWithOffscreen(html) {
 }
 
 
+// --- AI API Call ---
 async function callAI(aiConfig, content) {
+    const { language: langCode = 'en' } = await chrome.storage.local.get('language');
+    const targetLanguage = langCode.startsWith('zh') ? 'Simplified Chinese' : 'English';
     const truncatedContent = content.substring(0, 5000);
     
-    const prompt = `你是一个严格遵循指令的文本处理API。你的任务是分析“网页内容”，并返回一个包含“summary”和“category”的JSON对象。
+    const prompt = `You are a text processing API that strictly follows instructions. Your task is to analyze the "Page Content" and return a single, valid JSON object with two keys: "summary" and "category".
 
-# 输出规则
-- 摘要(summary): 严格限制在30个字以内。
-- 分类(category): 提供最多6个最相关的分类，使用英文逗号(,)分隔。
-- 你的回复必须且只能是一个格式正确的JSON对象，禁止包含任何解释、注释、Markdown标记或其他无关文本。
+# Rules
+- The language for the "summary" and "category" values MUST be: ${targetLanguage}.
+- summary: A concise summary, strictly under 30 words.
+- category: Provide up to 6 most relevant categories, separated by a single comma.
+- Your entire response must ONLY be the JSON object, with no extra text, explanations, or markdown.
 
-# 网页内容
+# Page Content
 ---
 ${truncatedContent}
 ---
 
-# 生成JSON输出`;
+# Generate JSON output in ${targetLanguage}`;
 
     let apiUrl, body;
     const headers = {
@@ -290,19 +308,17 @@ ${truncatedContent}
             model: aiConfig.model,
             messages: [{ role: 'user', content: prompt }],
             response_format: { type: "json_object" },
-            max_tokens: 200,
-            temperature: 0.2
+            max_tokens: 250, temperature: 0.2
         };
     } else if (aiConfig.provider === 'deepseek') {
         apiUrl = 'https://api.deepseek.com/v1/chat/completions';
         body = {
             model: aiConfig.model,
             messages: [{ role: 'user', content: prompt }],
-            max_tokens: 200,
-            temperature: 0.2
+            max_tokens: 250, temperature: 0.2
         };
     } else {
-        throw new Error("不支持的AI提供商");
+        throw new Error(chrome.i18n.getMessage("errorUnsupportedProvider"));
     }
 
     const response = await fetch(apiUrl, {
@@ -312,50 +328,27 @@ ${truncatedContent}
     });
 
     if (!response.ok) {
-        const errorBody = await response.json();
-        console.error("AI API Error:", errorBody);
-        throw new Error(`AI API请求失败: ${errorBody.error?.message || response.statusText}`);
+        const errorBody = await response.json().catch(() => ({}));
+        const errorMessage = errorBody.error?.message || response.statusText;
+        throw new Error(chrome.i18n.getMessage("errorApiRequest", { message: errorMessage }));
     }
 
     const data = await response.json();
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        throw new Error("AI返回了意料之外的数据结构");
-    }
-    
-    return data.choices[0].message.content || data.choices[0].message.reasoning_content || "";
+    return data.choices?.[0]?.message?.content || "";
 }
 
 function parseAIResponse(text) {
-    let summary = '';
-    let category = '';
-
-    try {
-        const data = JSON.parse(text);
-        summary = data.summary || '';
-        category = data.category || '';
-        if (summary || category) return { summary, category };
-    } catch (e) {
-        console.warn("AI response is not a direct JSON, trying to extract JSON block.");
-    }
-
     try {
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             const data = JSON.parse(jsonMatch[0]);
-            summary = data.summary || '';
-            category = data.category || '';
-            if (summary || category) return { summary, category };
+            return {
+                summary: data.summary || '',
+                category: data.category || ''
+            };
         }
     } catch (e) {
-        console.warn("Failed to parse extracted JSON block, falling back to regex.");
+        console.warn("Failed to parse JSON from AI response:", text, e);
     }
-    
-    if (!summary && !category) {
-        const summaryMatch = text.match(/SUMMARY:\s*(.*)/i);
-        const categoriesMatch = text.match(/CATEGORIES:\s*(.*)/i);
-        summary = summaryMatch ? summaryMatch[1].trim() : '';
-        category = categoriesMatch ? categoriesMatch[1].trim() : '';
-    }
-
-    return { summary, category };
+    return { summary: '', category: '' };
 }

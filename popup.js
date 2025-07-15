@@ -1,69 +1,70 @@
-document.addEventListener('DOMContentLoaded', initPopup);
+document.addEventListener('DOMContentLoaded', async () => {
+  const i18n = new I18nManager();
 
-function initPopup() {
-  // 初始化状态
+  // Determine language to use. Use 'zh_CN' to match folder name.
+  const { language: storedLang } = await chrome.storage.local.get('language');
+  const lang = storedLang || (chrome.i18n.getUILanguage().startsWith('zh') ? 'zh_CN' : 'en');
+  
+  await i18n.loadMessages(lang);
+  i18n.applyToDOM();
+
+  initPopup(i18n);
+});
+
+
+function initPopup(i18n) {
+  // --- App State ---
   let currentTab = 'all';
   let bookmarks = [];
 
-  // 元素引用
+  // --- Element References ---
   const addCurrentBtn = document.getElementById('addCurrent');
   const openOptionsBtn = document.getElementById('openOptions');
   const tabs = document.querySelectorAll('.tab');
   const bookmarkList = document.getElementById('bookmarkList');
 
-  // --- 事件监听 ---
+  // --- Event Listeners ---
   addCurrentBtn.addEventListener('click', handleAddCurrent);
   openOptionsBtn.addEventListener('click', handleOpenOptions);
   tabs.forEach(tab => tab.addEventListener('click', handleTabSwitch));
-  
-  // 使用事件委托处理书签列表的点击事件
   bookmarkList.addEventListener('click', handleListClick);
 
-  // 初始化数据加载
+  // --- Init ---
   loadBookmarks();
-  
-  // 监听存储变化
   chrome.storage.onChanged.addListener(handleStorageChange);
 
-  // --- 事件处理函数 ---
+  // --- Event Handlers ---
 
-  // 处理添加当前页面
   function handleAddCurrent() {
     chrome.runtime.sendMessage({ action: "addCurrentPage" }, response => {
       if (chrome.runtime.lastError) {
-        console.error('添加当前页面失败:', chrome.runtime.lastError);
-        showToast("操作失败，请重试", 2000, "#ff4444");
+        console.error('Add current page failed:', chrome.runtime.lastError);
+        showToast(i18n.get("operationFailed"), 2000, "#ff4444");
         return;
       }
-      if (response?.status === "success") {
-        showToast("已添加当前页面");
+      if (response?.status === "queued") {
+        showToast(i18n.get("taskQueued"));
       } else if (response?.status === "duplicate") {
-        showToast("该页面已存在，无需重复添加", 2000, "#ff4444");
+        showToast(i18n.get("pageExists"), 2000, "#ff4444");
       } else if (response?.status === "no_active_tab") {
-        showToast("未找到活动标签页", 2000, "#ff4444");
+        showToast(i18n.get("noActiveTab"), 2000, "#ff4444");
       }
     });
   }
 
-  // 打开设置页面
   function handleOpenOptions() {
     chrome.runtime.openOptionsPage();
   }
 
-  // 处理书签列表的集中点击事件（事件委托）
   function handleListClick(event) {
     const target = event.target;
-
-    // 处理星标点击
     const star = target.closest('.star');
     if (star) {
-      // 修复: ID是字符串，不应使用 parseFloat
       const id = star.dataset.id;
       handleStarToggle(id, star);
       return;
     }
 
-    // 处理标题/URL点击
     const clickable = target.closest('.clickable');
     if (clickable) {
       const url = clickable.dataset.url;
@@ -74,40 +75,43 @@ function initPopup() {
     }
   }
 
-  // 处理星标切换
   function handleStarToggle(id, starElement) {
-    chrome.runtime.sendMessage({
-      action: "toggleStar",
-      id: id
-    }, response => {
+    chrome.runtime.sendMessage({ action: "toggleStar", id: id }, response => {
       if (chrome.runtime.lastError) {
-        console.error('切换星标失败:', chrome.runtime.lastError);
-        showToast("操作失败，请重试", 2000, "#ff4444");
+        console.error('Toggle star failed:', chrome.runtime.lastError);
+        showToast(i18n.get("operationFailed"), 2000, "#ff4444");
         return;
       }
       if (response?.status === "success") {
-        // 优化: 根据后台返回的真实状态更新UI
         starElement.classList.toggle('starred', response.isStarred);
       } else {
-        showToast(response?.message || "书签不存在", 2000, "#ff4444");
+        showToast(response?.message || i18n.get("bookmarkNotFound"), 2000, "#ff4444");
       }
     });
   }
 
-  // 处理选项卡切换
   function handleTabSwitch(event) {
     const tab = event.target;
     if (tab.classList.contains('active')) return;
-
     tabs.forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     currentTab = tab.dataset.tab;
     renderBookmarks();
   }
 
-  // --- 数据和渲染 ---
+  function handleStorageChange(changes) {
+    if (changes.bookmarks) {
+      bookmarks = changes.bookmarks.newValue || [];
+      renderBookmarks();
+    }
+    // If language is changed from options page, reload popup to reflect it.
+    if (changes.language) {
+        location.reload();
+    }
+  }
 
-  // 加载书签数据
+  // --- Data & Rendering ---
+
   function loadBookmarks() {
     chrome.storage.local.get("bookmarks", data => {
       bookmarks = data.bookmarks || [];
@@ -115,32 +119,25 @@ function initPopup() {
     });
   }
 
-  // 渲染书签列表
   function renderBookmarks() {
     bookmarkList.innerHTML = '';
-    
-    const filtered = currentTab === 'all' 
-      ? bookmarks 
-      : bookmarks.filter(b => b.isStarred);
+    const filtered = currentTab === 'all' ? bookmarks : bookmarks.filter(b => b.isStarred);
 
     if (filtered.length === 0) {
-      bookmarkList.innerHTML = '<div class="empty-state">暂无收藏</div>';
+      bookmarkList.innerHTML = `<div class="empty-state">${i18n.get("noBookmarks")}</div>`;
       return;
     }
-
-    filtered.forEach(bookmark => {
+    filtered.slice(0, 100).forEach(bookmark => {
       const item = createBookmarkElement(bookmark);
       bookmarkList.appendChild(item);
     });
   }
 
-  // 创建单个书签元素
   function createBookmarkElement(bookmark) {
     const div = document.createElement('div');
     div.className = 'bookmark-item';
     const faviconUrl = getFaviconUrl(bookmark.url);
-    
-    let statusHTML = getStatusHTML(bookmark);
+    const statusHTML = getStatusHTML(bookmark);
     
     div.innerHTML = `
       <img class="favicon" src="${faviconUrl}" width="16" height="16" loading="lazy" alt="">
@@ -154,36 +151,25 @@ function initPopup() {
       </div>
       <div class="star ${bookmark.isStarred ? 'starred' : ''}" data-id="${bookmark.id}">★</div>
     `;
-    
     return div;
   }
 
-  // 处理存储变化
-  function handleStorageChange(changes) {
-    if (changes.bookmarks) {
-      bookmarks = changes.bookmarks.newValue || [];
-      renderBookmarks();
-    }
-  }
-
-  // --- 工具函数 ---
+  // --- Utility Functions ---
 
   function getStatusHTML(bookmark) {
-    if (!bookmark.aiStatus) return '';
+    const status = bookmark.aiStatus;
+    if (!status || status === 'completed') return '';
     
     let statusClass = '', statusText = '';
-    switch(bookmark.aiStatus) {
+    switch(status) {
+      case 'pending':
       case 'processing':
         statusClass = 'status-processing';
-        statusText = 'AI处理中...';
-        break;
-      case 'completed':
-        statusClass = 'status-completed';
-        statusText = '';
+        statusText = i18n.get("aiProcessing");
         break;
       case 'failed':
         statusClass = 'status-failed';
-        statusText = bookmark.aiError || 'AI处理失败';
+        statusText = bookmark.aiError || i18n.get("aiFailed");
         break;
     }
     
@@ -196,6 +182,7 @@ function initPopup() {
   }
 
   function formatDate(isoString) {
+    if (!isoString) return '';
     const date = new Date(isoString);
     return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
   }

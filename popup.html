@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en" data-i18n-title="extensionName">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>智能网页收藏夹</title>
+  <title>Smart Bookmarker</title>
   <style>
     body {
       width: 400px;
@@ -103,7 +103,6 @@
       color: #999;
       margin-top: 3px;
     }
-    /* AI状态样式 */
     .ai-status {
       display: flex;
       align-items: center;
@@ -149,36 +148,20 @@
 </head>
 <body>
   <div class="header">
-    <button id="addCurrent">添加当前页面</button>
-    <button id="openOptions">设置</button>
+    <button id="addCurrent" data-i18n="addCurrentPage"></button>
+    <button id="openOptions" data-i18n="settings"></button>
   </div>
 
   <div class="tabs">
-    <div class="tab active" data-tab="all">全部收藏</div>
-    <div class="tab" data-tab="starred">重点关注</div>
+    <div class="tab active" data-tab="all" data-i18n="allBookmarks"></div>
+    <div class="tab" data-tab="starred" data-i18n="starredBookmarks"></div>
   </div>
 
   <div class="bookmark-list" id="bookmarkList">
-    <!-- 书签列表模板 -->
-    <template id="bookmarkTemplate">
-      <div class="bookmark-item">
-        <div class="bookmark-info">
-          <div class="bookmark-title">{{title}}</div>
-          <div class="bookmark-url">{{url}}</div>
-          <div class="bookmark-category">{{category}}</div>
-          <div class="bookmark-summary">{{summary}}</div>
-          <div class="bookmark-date">{{date}}</div>
-          <div class="ai-status" data-status="{{aiStatus}}">
-            <div class="status-icon"></div>
-            <span class="status-text">{{aiError}}</span>
-          </div>
-        </div>
-        <div class="star" data-id="{{id}}">★</div>
-      </div>
-    </template>
-    <div class="empty-state">暂无收藏</div>
+    <div class="empty-state" data-i18n="noBookmarks"></div>
   </div>
 
+  <script src="i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
