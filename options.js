@@ -220,10 +220,26 @@ function initOptions(i18n, currentLang) {
     let filtered = currentTab === 'all' ? bookmarks : bookmarks.filter(b => b.isStarred);
 
     if (query) {
+        // 首先，按 "或" 关系 `|` 分割成组
+        const orGroups = query.split('|').map(g => g.trim()).filter(g => g);
+
         filtered = filtered.filter(b => {
-            return (b.title?.toLowerCase() || '').includes(query) ||
-                   (b.summary?.toLowerCase() || '').includes(query) ||
-                   (b.category?.toLowerCase() || '').includes(query);
+            // 将书签的所有可搜索字段（标题、摘要、分类、URL）合并成一个字符串
+            const searchableText = [
+                b.title?.toLowerCase() || '',
+                b.summary?.toLowerCase() || '',
+                b.category?.toLowerCase() || '',
+                b.url?.toLowerCase() || ''
+            ].join(' ');
+
+            // 只要有一个 "或" 组匹配成功即可 (some)
+            return orGroups.some(group => {
+                // 然后，在每个组内，按 "与" 关系 ` ` 分割成关键词
+                const andKeywords = group.split(' ').filter(k => k);
+                
+                // 组内的所有关键词都必须匹配 (every)
+                return andKeywords.every(keyword => searchableText.includes(keyword));
+            });
         });
     }
 
