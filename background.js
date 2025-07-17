@@ -352,7 +352,6 @@ async function callAI(aiConfig, content) {
     const { language: langCode = 'en' } = await chrome.storage.local.get('language');
     const targetLanguage = langCode.startsWith('zh') ? 'Simplified Chinese' : 'English';
     const truncatedContent = content.substring(0, 5000);
-    // **MODIFICATION 1: Updated the prompt to be more direct and strict.**
     const prompt = `Analyze the following text. Your response MUST be a JSON object and nothing else. Do not include any reasoning, explanations, or conversational text. The JSON object must have a "summary" key (a summary under 30 words) and a "category" key (up to 6 comma-separated keywords). The language of the values in the JSON must be ${targetLanguage}. Text: --- ${truncatedContent} ---`;
     
     let apiUrl, body;
@@ -405,7 +404,6 @@ async function callAI(aiConfig, content) {
     }
 
     const data = await response.json();
-    // **MODIFICATION 2: Only get data from 'content' and ignore 'reasoning'.**
     return data.choices?.[0]?.message?.content || "";
 }
 
@@ -417,3 +415,32 @@ function parseAIResponse(text) {
     } catch (e) { console.warn("Failed to parse JSON from AI response:", text, e); }
     return { summary: '', category: '' };
 }
+
+
+// =======================================================================
+// **MODIFICATION: Added a new listener for context menu clicks.**
+// =======================================================================
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    // Check if the clicked menu item is ours
+    if (info.menuItemId === CONTEXT_MENU_ID) {
+        // This logic is adapted from the 'addCurrentPage' message handler
+
+        // 1. Validate the tab
+        if (!tab || !tab.url || tab.url.startsWith('chrome://')) {
+            console.warn("Cannot bookmark an invalid tab from context menu.");
+            return;
+        }
+
+        // 2. Check for duplicates before adding
+        const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+        if (bookmarkItems.some(b => b.type === 'bookmark' && b.url === tab.url)) {
+            console.warn(`Bookmark for URL ${tab.url} already exists.`);
+            // You could optionally send a notification to the user here.
+            return;
+        }
+
+        // 3. Call the existing function to add the bookmark and enqueue the AI task
+        // We pass "addCurrentPage" as the action and the tab object.
+        await handleAsyncBookmarkAction("addCurrentPage", { parentId: 'root' }, tab);
+    }
+});
