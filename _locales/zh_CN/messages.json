@@ -41,5 +41,15 @@
   "errorAiResponseFormat": { "message": "AI未能按预期格式返回内容" },
   "errorUnsupportedProvider": { "message": "不支持的AI提供商" },
   "errorApiRequest": { "message": "AI API请求失败: ${message}" },
-  "bookmarkThisPage": { "message": "收藏此页面" }
+  "bookmarkThisPage": { "message": "收藏此页面" },
+  "deleteFolder": { "message": "删除文件夹" },
+  "confirmDeleteFolder": { "message": "确定要删除文件夹 “$folderName$” 及其所有内容吗？此操作无法撤销。",
+    "placeholders": {
+      "folderName": {
+        "content": "$1"
+      }
+    }
+ },
+  "folderDeleted": { "message": "文件夹已删除." },
+  "contextMenuTitle": { "message": "使用 AI 添加书签" }
 }

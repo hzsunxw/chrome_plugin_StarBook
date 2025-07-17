@@ -16,6 +16,7 @@
   "host_permissions": [
     "https://api.openai.com/*",
     "https://api.deepseek.com/*",
+    "https://openrouter.ai/*",
     "<all_urls>"
   ],
   "action": {

@@ -1,7 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const i18n = new I18nManager();
-
-  // Determine language to use. Use 'zh_CN' to match folder name.
   const { language: storedLang } = await chrome.storage.local.get('language');
   const lang = storedLang || (chrome.i18n.getUILanguage().startsWith('zh') ? 'zh_CN' : 'en');
   
@@ -15,7 +13,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 function initPopup(i18n) {
   // --- App State ---
   let currentTab = 'all';
-  let bookmarks = [];
+  let allItems = [];
 
   // --- Element References ---
   const addCurrentBtn = document.getElementById('addCurrent');
@@ -30,15 +28,15 @@ function initPopup(i18n) {
   bookmarkList.addEventListener('click', handleListClick);
 
   // --- Init ---
-  loadBookmarks();
+  loadItems();
   chrome.storage.onChanged.addListener(handleStorageChange);
 
   // --- Event Handlers ---
 
   function handleAddCurrent() {
-    chrome.runtime.sendMessage({ action: "addCurrentPage" }, response => {
+    // Adding to root by default from popup
+    chrome.runtime.sendMessage({ action: "addCurrentPage", data: { parentId: 'root' } }, response => {
       if (chrome.runtime.lastError) {
-        console.error('Add current page failed:', chrome.runtime.lastError);
         showToast(i18n.get("operationFailed"), 2000, "#ff4444");
         return;
       }
@@ -46,8 +44,6 @@ function initPopup(i18n) {
         showToast(i18n.get("taskQueued"));
       } else if (response?.status === "duplicate") {
         showToast(i18n.get("pageExists"), 2000, "#ff4444");
-      } else if (response?.status === "no_active_tab") {
-        showToast(i18n.get("noActiveTab"), 2000, "#ff4444");
       }
     });
   }
@@ -60,8 +56,7 @@ function initPopup(i18n) {
     const target = event.target;
     const star = target.closest('.star');
     if (star) {
-      const id = star.dataset.id;
-      handleStarToggle(id, star);
+      handleStarToggle(star.dataset.id, star);
       return;
     }
 
@@ -71,21 +66,17 @@ function initPopup(i18n) {
       if (url) {
         chrome.tabs.create({ url: url });
       }
-      return;
     }
   }
 
   function handleStarToggle(id, starElement) {
     chrome.runtime.sendMessage({ action: "toggleStar", id: id }, response => {
       if (chrome.runtime.lastError) {
-        console.error('Toggle star failed:', chrome.runtime.lastError);
         showToast(i18n.get("operationFailed"), 2000, "#ff4444");
         return;
       }
       if (response?.status === "success") {
         starElement.classList.toggle('starred', response.isStarred);
-      } else {
-        showToast(response?.message || i18n.get("bookmarkNotFound"), 2000, "#ff4444");
       }
     });
   }
@@ -100,11 +91,10 @@ function initPopup(i18n) {
   }
 
   function handleStorageChange(changes) {
-    if (changes.bookmarks) {
-      bookmarks = changes.bookmarks.newValue || [];
+    if (changes.bookmarkItems) {
+      allItems = changes.bookmarkItems.newValue || [];
       renderBookmarks();
     }
-    // If language is changed from options page, reload popup to reflect it.
     if (changes.language) {
         location.reload();
     }
@@ -112,21 +102,29 @@ function initPopup(i18n) {
 
   // --- Data & Rendering ---
 
-  function loadBookmarks() {
-    chrome.storage.local.get("bookmarks", data => {
-      bookmarks = data.bookmarks || [];
+  function loadItems() {
+    chrome.storage.local.get("bookmarkItems", data => {
+      allItems = data.bookmarkItems || [];
       renderBookmarks();
     });
   }
 
   function renderBookmarks() {
     bookmarkList.innerHTML = '';
+    
+    // Get only bookmarks, not folders
+    let bookmarks = allItems.filter(item => item.type === 'bookmark');
+
+    // Filter by tab (all or starred)
     const filtered = currentTab === 'all' ? bookmarks : bookmarks.filter(b => b.isStarred);
 
     if (filtered.length === 0) {
       bookmarkList.innerHTML = `<div class="empty-state">${i18n.get("noBookmarks")}</div>`;
       return;
     }
+
+    // Sort by date added and take the most recent 100
+    filtered.sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
     filtered.slice(0, 100).forEach(bookmark => {
       const item = createBookmarkElement(bookmark);
       bookmarkList.appendChild(item);
@@ -137,6 +135,7 @@ function initPopup(i18n) {
     const div = document.createElement('div');
     div.className = 'bookmark-item';
     const faviconUrl = getFaviconUrl(bookmark.url);
+    // **MODIFICATION: Added statusHTML logic**
     const statusHTML = getStatusHTML(bookmark);
     
     div.innerHTML = `
@@ -156,63 +155,36 @@ function initPopup(i18n) {
 
   // --- Utility Functions ---
 
+  // **MODIFICATION: Added getStatusHTML function**
   function getStatusHTML(bookmark) {
     const status = bookmark.aiStatus;
     if (!status || status === 'completed') return '';
     
-    let statusClass = '', statusText = '';
+    let statusText = '';
+    let statusClass = '';
+
     switch(status) {
       case 'pending':
-      case 'processing':
-        statusClass = 'status-processing';
         statusText = i18n.get("aiProcessing");
+        statusClass = 'status-processing';
+        break;
+      case 'processing':
+        statusText = i18n.get("aiProcessing");
+        statusClass = 'status-processing';
         break;
       case 'failed':
+        statusText = i18n.get("aiFailed");
         statusClass = 'status-failed';
-        statusText = bookmark.aiError || i18n.get("aiFailed");
         break;
     }
-    
-    return `
-      <div class="ai-status">
-        <div class="status-icon ${statusClass}"></div>
-        <span class="status-text">${statusText}</span>
-      </div>
-    `;
-  }
 
-  function formatDate(isoString) {
-    if (!isoString) return '';
-    const date = new Date(isoString);
-    return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-  }
-
-  function showToast(message, duration=2000, color="#4285f4") {
-    const toast = document.createElement('div');
-    toast.textContent = message;
-    Object.assign(toast.style, {
-      position: 'fixed',
-      top: '20px',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      background: color,
-      color: 'white',
-      padding: '10px 20px',
-      borderRadius: '4px',
-      zIndex: 1000,
-      textAlign: 'center'
-    });
-    
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), duration);
-  }
-
-  function getFaviconUrl(url) {
-    try {
-      const domain = new URL(url).hostname;
-      return `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
-    } catch {
-      return 'icons/icon16.png';
+    if (statusText) {
+      return `<div class="ai-status"><div class="status-icon ${statusClass}"></div>${statusText}</div>`;
     }
+    return '';
   }
+
+  function formatDate(isoString) { if (!isoString) return ''; const d = new Date(isoString); return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`; }
+  function showToast(message, duration=2000, color="#4285f4") { const t = document.createElement('div'); t.textContent = message; Object.assign(t.style, { position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', background: color, color: 'white', padding: '10px 20px', borderRadius: '4px', zIndex: 1000, textAlign: 'center' }); document.body.appendChild(t); setTimeout(() => t.remove(), duration); }
+  function getFaviconUrl(url) { try { return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=16`; } catch { return 'icons/icon16.png'; } }
 }

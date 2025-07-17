@@ -41,5 +41,15 @@
   "errorAiResponseFormat": { "message": "AI did not return content in the expected format" },
   "errorUnsupportedProvider": { "message": "Unsupported AI provider" },
   "errorApiRequest": { "message": "AI API request failed: ${message}" },
-  "bookmarkThisPage": { "message": "Bookmark this page" }
+  "bookmarkThisPage": { "message": "Bookmark this page" },
+  "deleteFolder": { "message": "Delete Folder" },
+  "confirmDeleteFolder": { "message": "Are you sure you want to delete the folder \"$folderName$\" and all its contents? This action cannot be undone.",
+    "placeholders": {
+      "folderName": {
+        "content": "$1"
+      }
+    }
+ },
+  "folderDeleted": { "message": "Folder has been deleted." },
+   "contextMenuTitle": { "message": "Bookmark with AI" }
 }
