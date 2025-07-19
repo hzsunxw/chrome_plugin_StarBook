@@ -34,16 +34,36 @@ function initPopup(i18n) {
   // --- Event Handlers ---
 
   function handleAddCurrent() {
+    // 添加调试信息
+    console.log("Add current page button clicked");
+    
+    // 显示加载状态
+    showToast(i18n.get("processing") || "Processing...");
+    
     // Adding to root by default from popup
     chrome.runtime.sendMessage({ action: "addCurrentPage", data: { parentId: 'root' } }, response => {
+      console.log("Response received:", response);
+      
       if (chrome.runtime.lastError) {
-        showToast(i18n.get("operationFailed"), 2000, "#ff4444");
+        console.error("Runtime error:", chrome.runtime.lastError);
+        showToast(i18n.get("operationFailed") || "Operation failed", 2000, "#ff4444");
         return;
       }
-      if (response?.status === "queued") {
-        showToast(i18n.get("taskQueued"));
-      } else if (response?.status === "duplicate") {
-        showToast(i18n.get("pageExists"), 2000, "#ff4444");
+      
+      if (!response) {
+        console.error("No response received");
+        showToast(i18n.get("operationFailed") || "Operation failed", 2000, "#ff4444");
+        return;
+      }
+      
+      if (response.status === "queued") {
+        showToast(i18n.get("taskQueued") || "Task queued");
+      } else if (response.status === "duplicate") {
+        showToast(i18n.get("pageExists") || "Page already exists", 2000, "#ff4444");
+      } else if (response.status === "no_active_tab") {
+        showToast(i18n.get("noActiveTab") || "No active tab", 2000, "#ff4444");
+      } else {
+        showToast(i18n.get("operationFailed") || "Operation failed", 2000, "#ff4444");
       }
     });
   }
@@ -135,27 +155,74 @@ function initPopup(i18n) {
     const div = document.createElement('div');
     div.className = 'bookmark-item';
     const faviconUrl = getFaviconUrl(bookmark.url);
-    // **MODIFICATION: Added statusHTML logic**
     const statusHTML = getStatusHTML(bookmark);
     
-    div.innerHTML = `
+    let html = `
       <img class="favicon" src="${faviconUrl}" width="16" height="16" loading="lazy" alt="">
       <div class="bookmark-info">
         <div class="bookmark-title clickable" data-url="${bookmark.url}">${bookmark.title}</div>
         <div class="bookmark-url clickable" data-url="${bookmark.url}">${bookmark.url}</div>
-        ${bookmark.category ? `<div class="bookmark-category">${bookmark.category}</div>` : ''}
-        ${bookmark.summary ? `<div class="bookmark-summary">${bookmark.summary}</div>` : ''}
+    `;
+    
+    // 显示增强的AI分析结果
+    if (bookmark.aiStatus === 'completed') {
+      // 主分类
+      if (bookmark.category) {
+        html += `<div class="bookmark-category">${bookmark.category}</div>`;
+      }
+      
+      // 标签（在弹窗中只显示前3个）
+      if (bookmark.tags && bookmark.tags.length > 0) {
+        const displayTags = bookmark.tags.slice(0, 3);
+        html += `<div class="bookmark-tags-popup">
+          ${displayTags.map(tag => `<span class="tag-popup" data-tag="${tag}">${tag}</span>`).join('')}
+          ${bookmark.tags.length > 3 ? `<span class="tag-more">+${bookmark.tags.length - 3}</span>` : ''}
+        </div>`;
+      }
+      
+      // 摘要
+      if (bookmark.summary) {
+        html += `<div class="bookmark-summary">${bookmark.summary}</div>`;
+      }
+      
+      // 内容类型和阅读时间（紧凑显示）
+      if (bookmark.contentType || bookmark.estimatedReadTime) {
+        html += `<div class="bookmark-meta">`;
+        if (bookmark.contentType) {
+          html += `<span class="meta-item">${i18n.get('contentType_' + bookmark.contentType) || bookmark.contentType}</span>`;
+        }
+        if (bookmark.estimatedReadTime) {
+          html += `<span class="meta-item">${bookmark.estimatedReadTime}${i18n.get('minutes')}</span>`;
+        }
+        html += `</div>`;
+      }
+    } else {
+      html += statusHTML;
+    }
+    
+    html += `
         <div class="bookmark-date">${formatDate(bookmark.dateAdded)}</div>
-        ${statusHTML}
       </div>
       <div class="star ${bookmark.isStarred ? 'starred' : ''}" data-id="${bookmark.id}">★</div>
     `;
+    
+    div.innerHTML = html;
+    
+    // 添加标签点击事件监听器
+    const tagElements = div.querySelectorAll('.tag-popup[data-tag]');
+    tagElements.forEach(tagEl => {
+      tagEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // 可以添加标签搜索功能
+        console.log('Tag clicked:', tagEl.dataset.tag);
+      });
+    });
+    
     return div;
   }
 
   // --- Utility Functions ---
 
-  // **MODIFICATION: Added getStatusHTML function**
   function getStatusHTML(bookmark) {
     const status = bookmark.aiStatus;
     if (!status || status === 'completed') return '';
