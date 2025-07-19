@@ -508,7 +508,7 @@
           <div>
               <button id="importBookmarks" data-i18n="importBookmarks"></button>
               <button id="toggleAIConfig" data-i18n="aiConfig"></button>
-              <button id="toggleQA" data-i18n="qaSystem">智能问答</button>
+              <button id="toggleQA" data-i18n="qaSystem"></button>
           </div>
           <select id="languageSelector">
               <option value="en">English</option>
@@ -545,7 +545,6 @@
           </select>
         </div>
         
-        <!-- 新增：分析深度选项 -->
         <div class="input-group">
           <label for="aiAnalysisDepth" data-i18n="analysisDepth"></label>
           <select id="aiAnalysisDepth">
@@ -600,33 +599,21 @@
     </div>
   </div>
 
-  <!-- QA System Modal -->
   <div id="qaSection" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
     <div class="config-modal">
       <div class="config-header">
-        <h2 data-i18n="qaSystem">智能问答</h2>
+        <h2 data-i18n="qaSystem"></h2>
         <button id="closeQA" class="close-btn" data-i18n-title="close" title="Close">&times;</button>
       </div>
       <div class="config-form">
         <div class="input-group">
-          <label>输入问题:</label>
-          <textarea id="questionInput" data-i18n-placeholder="questionPlaceholder" rows="3" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="请输入您的问题..."></textarea>
+          <label data-i18n="qaQuestionLabel"></label>
+          <textarea id="questionInput" data-i18n-placeholder="questionPlaceholder" rows="3" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
         </div>
         <div class="input-group" style="justify-content: flex-end;">
-          <button id="askQuestion" data-i18n="askQuestion">提问</button>
+          <button id="askQuestion" data-i18n="askQuestion"></button>
         </div>
         <div class="qa-info" style="margin-top: 15px; padding: 15px; background: #f0f8ff; border-radius: 8px; font-size: 14px; min-height: 100px;">
-          <p>📚 智能问答系统</p>
-          <p>功能说明：</p>
-          <ul>
-            <li>✅ 智能回答各种问题</li>
-            <li>✅ 基于您的收藏偏好推荐网站</li>
-            <li>✅ 提供个性化建议和技巧</li>
-            <li>✅ 发现现有收藏中的相关内容</li>
-          </ul>
-          <p style="color: #666; font-size: 12px; margin-top: 10px;">
-            💡 提示：输入任何问题，AI会基于您的收藏偏好提供个性化答案和网站推荐
-          </p>
         </div>
       </div>
     </div>

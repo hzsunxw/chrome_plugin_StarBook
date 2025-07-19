@@ -1,98 +1,437 @@
 {
-  "extensionName": { "message": "智能网页收藏夹" },
-  "extensionDescription": { "message": "集AI摘要与分类于一身的增强型网页收藏管理工具。" },
-  "addCurrentPage": { "message": "添加当前页面" },
-  "settings": { "message": "设置" },
-  "allBookmarks": { "message": "全部收藏" },
-  "starredBookmarks": { "message": "重点关注" },
-  "noBookmarks": { "message": "暂无收藏" },
-  "aiProcessing": { "message": "AI处理中..." },
-  "aiFailed": { "message": "AI处理失败" },
-  "pageAdded": { "message": "已成功添加当前页面。" },
-  "pageExists": { "message": "该页面已存在，无需重复添加。" },
-  "noActiveTab": { "message": "未找到活动标签页。" },
-  "operationFailed": { "message": "操作失败，请重试。" },
-  "bookmarkNotFound": { "message": "书签不存在。" },
-  "optionsTitle": { "message": "智能收藏夹设置" },
-  "importBookmarks": { "message": "导入浏览器收藏夹" },
-  "aiConfig": { "message": "AI配置" },
-  "close": { "message": "关闭" },
-  "aiProvider": { "message": "AI服务提供商：" },
-  "apiKey": { "message": "API密钥：" },
-  "model": { "message": "模型：" },
-  "saveConfig": { "message": "保存配置" },
-  "totalBookmarks": { "message": "总收藏" },
-  "searchPlaceholder": { "message": "搜索标题、摘要、分类或AI标签..." },
-  "noMatchingBookmarks": { "message": "无匹配收藏" },
-  "confirmDelete": { "message": "确定要删除这个书签吗？" },
-  "configSaved": { "message": "AI设置已保存。" },
-  "importSuccess": { "message": "成功导入 ${count} 个书签。" },
-  "importNoNew": { "message": "没有新书签可导入。" },
-  "importFailed": { "message": "导入失败。" },
-  "bookmarkDeleted": { "message": "书签已删除。" },
-  "regenerateRequestSent": { "message": "已发送重新生成请求..." },
-  "language": { "message": "语言：" },
-  "languageChanged": { "message": "语言已切换，页面即将刷新。" },
-  "generalSettings": { "message": "通用设置" },
-  "taskQueued": { "message": "任务已加入处理队列。" },
-  "errorGeneric": { "message": "发生错误" },
-  "errorMissingApiKey": { "message": "AI未配置或API密钥缺失" },
-  "errorContentExtraction": { "message": "无法提取有效页面内容" },
-  "errorAiResponseFormat": { "message": "AI未能按预期格式返回内容" },
-  "errorUnsupportedProvider": { "message": "不支持的AI提供商" },
-  "errorApiRequest": { "message": "AI API请求失败: ${message}" },
-  "bookmarkThisPage": { "message": "收藏此页面" },
-  "deleteFolder": { "message": "删除文件夹" },
-  "confirmDeleteFolder": { "message": "确定要删除文件夹 “$folderName$” 及其所有内容吗？此操作无法撤销。",
-    "placeholders": {
-      "folderName": {
-        "content": "$1"
-      }
-    }
- },
-  "folderDeleted": { "message": "文件夹已删除." },
-  "contextMenuTitle": { "message": "使用 AI 添加书签" },
-  "analysisDepth": { "message": "AI分析深度：" },
-  "analysisDepthBasic": { "message": "基础 (更快)" },
-  "analysisDepthStandard": { "message": "标准" },
-  "analysisDepthDetailed": { "message": "详细 (更全面)" },
-  "analysisDepthHelp": { "message": "更高的分析深度提供更详细的分析结果，但耗时更长且消耗更多API额度。" },
-  "contentType": { "message": "内容类型" },
-  "readingLevel": { "message": "阅读难度" },
-  "keyPoints": { "message": "要点" },
-  "estimatedReadTime": { "message": "预计阅读时间" },
-  "minutes": { "message": "分钟" },
-  "sentiment": { "message": "情感倾向" },
+  "extensionName": {
+    "message": "AI智能书签",
+    "description": "扩展程序的名称。"
+  },
+  "extensionDescription": {
+    "message": "使用AI自动为您的书签分类、总结和添加标签。提供智能搜索和问答功能。",
+    "description": "扩展程序的描述。"
+  },
+  "optionsTitle": {
+    "message": "智能书签设置",
+    "description": "选项页的标题。"
+  },
+  "contextMenuTitle": {
+    "message": "使用AI添加书签",
+    "description": "右键菜单项的文本。"
+  },
+  "addCurrentPage": {
+    "message": "添加当前页面",
+    "description": "将当前浏览器标签页添加为书签的按钮。"
+  },
+  "settings": {
+    "message": "管理全部",
+    "description": "打开主选项/管理页面的按钮。"
+  },
+  "allBookmarks": {
+    "message": "全部书签",
+    "description": "显示所有书签的标签/标签页。"
+  },
+  "starredBookmarks": {
+    "message": "已加星",
+    "description": "显示已加星书签的标签/标签页。"
+  },
+  "noBookmarks": {
+    "message": "还没有书签，快添加一些吧！",
+    "description": "书签列表为空时显示的消息。"
+  },
+  "processing": {
+    "message": "处理中...",
+    "description": "通用的“处理中”状态消息。"
+  },
+  "operationFailed": {
+    "message": "操作失败",
+    "description": "操作失败时的通用错误消息。"
+  },
+  "taskQueued": {
+    "message": "AI分析任务已加入队列。",
+    "description": "新书签已排队等待AI处理的通知。"
+  },
+  "pageExists": {
+    "message": "此页面已在您的书签中。",
+    "description": "尝试添加重复书签时的错误消息。"
+  },
+  "noActiveTab": {
+    "message": "没有可添加书签的活动标签页。",
+    "description": "用户尝试添加书签但没有有效标签页时的错误。"
+  },
+  "toggleStar": {
+    "message": "切换星标",
+    "description": "星形按钮的工具提示。"
+  },
+  "delete": {
+    "message": "删除",
+    "description": "删除按钮的工具提示。"
+  },
+  "minutes": {
+    "message": " 分钟阅读",
+    "description": "预计阅读时间的后缀，例如“5 分钟阅读”。"
+  },
+  "importBookmarks": {
+    "message": "从浏览器导入",
+    "description": "导入现有浏览器书签的按钮。"
+  },
+  "aiConfig": {
+    "message": "AI 配置",
+    "description": "AI设置部分/模态框的标题。"
+  },
+  "qaSystem": {
+    "message": "智能问答",
+    "description": "智能问答系统的按钮/标题。"
+  },
+  "searchPlaceholder": {
+    "message": "搜索书签... (例如, '科技 | 设计' 表示或)",
+    "description": "搜索输入框的占位符文本。"
+  },
+  "close": {
+    "message": "关闭",
+    "description": "关闭(X)按钮的工具提示。"
+  },
+  "aiProvider": {
+    "message": "AI 服务商",
+    "description": "AI服务商选择下拉菜单的标签。"
+  },
+  "analysisDepth": {
+    "message": "分析深度",
+    "description": "AI分析深度设置的标签。"
+  },
+  "analysisDepthBasic": {
+    "message": "基础 (摘要 + 标签)",
+    "description": "AI分析的基础级别选项。"
+  },
+  "analysisDepthStandard": {
+    "message": "标准 (推荐)",
+    "description": "AI分析的标准级别选项。"
+  },
+  "analysisDepthDetailed": {
+    "message": "详细 (包含关键点)",
+    "description": "AI分析的详细级别选项。"
+  },
+  "analysisDepthHelp": {
+    "message": "更深的分析会消耗更多Token。",
+    "description": "分析深度设置的帮助文本。"
+  },
+  "apiKey": {
+    "message": "API 密钥",
+    "description": "API密钥输入框的标签。"
+  },
+  "model": {
+    "message": "模型",
+    "description": "AI模型选择的标签。"
+  },
+  "saveConfig": {
+    "message": "保存配置",
+    "description": "保存AI设置的按钮。"
+  },
+  "qaQuestionLabel": {
+    "message": "您的问题：",
+    "description": "问答问题输入文本区域的标签。"
+  },
+  "questionPlaceholder": {
+    "message": "例如：推荐一些免费的PDF转PPT工具",
+    "description": "问答问题输入的占位符。"
+  },
+  "askQuestion": {
+    "message": "提问",
+    "description": "在问答系统中提交问题的按钮。"
+  },
+  "deleteFolder": {
+    "message": "删除文件夹",
+    "description": "删除文件夹的上下文菜单项。"
+  },
+  "initializationError": {
+    "message": "错误：无法加载扩展设置。请尝试重新加载页面。",
+    "description": "选项页初始化失败时的错误消息。"
+  },
+  "confirmDelete": {
+    "message": "您确定要删除此书签吗？",
+    "description": "删除单个书签前的确认提示。"
+  },
+  "bookmarkDeleted": {
+    "message": "书签已删除。",
+    "description": "确认书签已删除的提示消息。"
+  },
+  "languageChanged": {
+    "message": "语言已更改。页面即将重新加载。",
+    "description": "更改UI语言时的提示消息。"
+  },
+  "configSaved": {
+    "message": "配置已成功保存。",
+    "description": "确认AI设置已保存的提示消息。"
+  },
+  "importFailed": {
+    "message": "导入失败。请重试。",
+    "description": "书签导入失败的提示消息。"
+  },
+  "importSuccess": {
+    "message": "成功导入 ${count} 个新书签。",
+    "description": "成功导入的提示消息。"
+  },
+  "importNoNew": {
+    "message": "没有新的书签可导入。",
+    "description": "导入时未发现新书签的提示消息。"
+  },
+  "regenerateRequestSent": {
+    "message": "已发送重新生成AI数据的请求。",
+    "description": "用户请求AI重新分析时的提示消息。"
+  },
+  "taskAlreadyQueued": {
+    "message": "此任务已在队列中。",
+    "description": "尝试将已排队的任务再次入队时的提示消息。"
+  },
+  "aiRegenerateStarted": {
+    "message": "AI重新生成任务已加入队列。",
+    "description": "确认重新分析已开始的提示。"
+  },
+  "confirmDeleteFolder": {
+    "message": "您确定要删除文件夹 '${folderName}' 及其所有内容吗？此操作无法撤销。",
+    "description": "删除文件夹及其内容前的确认提示。"
+  },
+  "folderDeleted": {
+    "message": "文件夹及其内容已删除。",
+    "description": "确认文件夹已删除的提示。"
+  },
+  "rootFolder": {
+    "message": "书签栏",
+    "description": "面包屑中根级文件夹的名称。"
+  },
+  "searchResults": {
+    "message": "搜索结果",
+    "description": "显示搜索结果时的面包屑文本。"
+  },
+  "noMatchingBookmarks": {
+    "message": "没有找到匹配您搜索的书签。",
+    "description": "搜索无结果时显示的消息。"
+  },
+  "folderEmpty": {
+    "message": "此文件夹为空。",
+    "description": "查看空文件夹时显示的消息。"
+  },
+  "regenerateAI": {
+    "message": "重新生成AI分析",
+    "description": "重新生成按钮的工具提示。"
+  },
+  "tagsMissing": {
+    "message": "AI分析未能生成标签。",
+    "description": "如果AI未能生成标签则显示此消息。"
+  },
+  "summaryMissing": {
+    "message": "AI分析未能生成摘要。",
+    "description": "如果AI未能生成摘要则显示此消息。"
+  },
+  "keyPoints": {
+    "message": "关键点",
+    "description": "关键点部分的标签。"
+  },
+  "contentType": {
+    "message": "内容类型",
+    "description": "内容类型的标签。"
+  },
+  "readingTime": {
+    "message": "阅读时间",
+    "description": "预计阅读时间的标签。"
+  },
+  "readingLevel": {
+    "message": "阅读难度",
+    "description": "阅读难度级别的标签。"
+  },
+  "readingLevel_beginner": { "message": "初级" },
+  "readingLevel_intermediate": { "message": "中级" },
+  "readingLevel_advanced": { "message": "高级" },
   "contentType_article": { "message": "文章" },
   "contentType_tutorial": { "message": "教程" },
   "contentType_news": { "message": "新闻" },
-  "contentType_reference": { "message": "参考资料" },
+  "contentType_reference": { "message": "参考" },
   "contentType_tool": { "message": "工具" },
   "contentType_entertainment": { "message": "娱乐" },
   "contentType_blog": { "message": "博客" },
   "contentType_documentation": { "message": "文档" },
-  "contentType_research": { "message": "研究" },
-  "readingLevel_beginner": { "message": "初级" },
-  "readingLevel_intermediate": { "message": "中级" },
-  "readingLevel_advanced": { "message": "高级" },
-  "sentiment_positive": { "message": "积极" },
-  "sentiment_negative": { "message": "消极" },
-  "sentiment_neutral": { "message": "中性" },
-  "toggleStar": { "message": "切换收藏星标" },
-  "regenerateAI": { "message": "重新AI处理" },
-  "delete": { "message": "删除书签" },
-  "taskAlreadyQueued": { "message": "该书签的AI处理已在进行中" },
-  "aiRegenerateStarted": { "message": "AI重新处理已开始，请稍后刷新查看结果" },
-  "tagsMissing": { "message": "标签信息缺失，建议重新AI处理" },
-  "summaryMissing": { "message": "摘要信息缺失，建议重新AI处理" },
-  "qaSystem": { "message": "智能问答" },
-  "askQuestion": { "message": "提问" },
-  "searchResults": { "message": "搜索结果" },
-  "searching": { "message": "正在搜索答案..." },
-  "foundAnswer": { "message": "找到答案" },
-  "recommendedSites": { "message": "推荐网站" },
-  "viewOriginal": { "message": "查看原文" },
-  "addToBookmarks": { "message": "添加收藏" },
-  "noAnswerFound": { "message": "在您的收藏中未找到相关答案" },
-  "questionPlaceholder": { "message": "请输入您的问题，我会在您的收藏中寻找答案..." }
+  "contentType_research": { "message": "研究论文" },
+  "aiProcessing": {
+    "message": "AI处理中...",
+    "description": "AI分析正在进行时的状态文本。"
+  },
+  "aiFailed": {
+    "message": "AI分析失败。",
+    "description": "AI分析失败时的状态文本。"
+  },
+  "qaMustEnterQuestion": {
+    "message": "请输入问题。",
+    "description": "用户点击“提问”但无输入时的警报。"
+  },
+  "qaSearchError": {
+    "message": "搜索过程中发生错误。",
+    "description": "问答系统中通用错误的警报。"
+  },
+  "qaSearchingBookmarks": {
+    "message": "正在搜索您的收藏...",
+    "description": "问答面板中的加载消息。"
+  },
+  "qaSystemTitle": {
+    "message": "智能问答系统",
+    "description": "问答面板的标题。"
+  },
+  "qaSystemDescription": {
+    "message": "功能说明：",
+    "description": "问答面板中功能列表的标题。"
+  },
+  "qaFeature1": { "message": "基于您的收藏回答问题" },
+  "qaFeature2": { "message": "推荐相关的新网站" },
+  "qaFeature3": { "message": "提供实用的技巧和建议" },
+  "qaFeature4": { "message": "帮助您重新发现已收藏的相关内容" },
+  "qaTip": {
+    "message": "提示：提出任何问题，AI将根据您的收藏偏好提供答案和网站推荐。",
+    "description": "问答面板中的帮助文本。"
+  },
+  "qaReasonRelated": {
+    "message": "来自您收藏中的一个相关网站。",
+    "description": "AI显示现有书签的理由。"
+  },
+  "qaJsonParseError": {
+    "message": "AI响应格式不正确，无法解析。",
+    "description": "AI响应不是有效JSON时的错误。"
+  },
+  "qaTipRetry": {
+    "message": "尝试换一种方式提问。",
+    "description": "给用户的提示。"
+  },
+  "qaTipCheckConfig": {
+    "message": "检查您的AI配置是否正确。",
+    "description": "给用户的提示。"
+  },
+  "qaAiSearchError": {
+    "message": "抱歉，AI问答功能暂时不可用。错误：${message}",
+    "description": "AI搜索失败的错误消息。"
+  },
+  "qaSearchGoogle": {
+    "message": "在谷歌上搜索您的问题。",
+    "description": "备用推荐。"
+  },
+  "qaSearchBaidu": {
+    "message": "在百度上搜索您的问题。",
+    "description": "备用推荐。"
+  },
+  "qaTruncatedError": {
+    "message": "抱歉，AI响应不完整，请重试。",
+    "description": "JSON被截断的错误。"
+  },
+  "qaTipRetryComplete": {
+    "message": "请重新提问以获得完整回答。",
+    "description": "JSON被截断错误的提示。"
+  },
+  "qaNoResults": {
+    "message": "抱歉，在您的收藏中没有找到关于 ${question} 的相关内容。",
+    "description": "问答搜索无结果时的消息。"
+  },
+  "qaSuggestions": {
+    "message": "建议",
+    "description": "建议列表的标题。"
+  },
+  "qaSuggestion1": { "message": "尝试使用不同的关键词。" },
+  "qaSuggestion2": { "message": "收藏更多相关的网站。" },
+  "qaSuggestion3": { "message": "等待AI分析完成后重试。" },
+  "qaResultsFound": {
+    "message": "在您的收藏中找到 ${count} 个相关结果：",
+    "description": "问答搜索结果的标题。"
+  },
+  "relevance": {
+    "message": "相关度",
+    "description": "相关度分数的标签。"
+  },
+  "viewDetails": {
+    "message": "查看详情",
+    "description": "按钮文本。"
+  },
+  "aiAnswer": {
+    "message": "AI 回答",
+    "description": "AI直接回答部分的标题。"
+  },
+  "relatedInBookmarks": {
+    "message": "您的收藏中的相关内容",
+    "description": "问答找到的现有书签的标题。"
+  },
+  "alreadyBookmarked": {
+    "message": "已收藏",
+    "description": "表示项目已被收藏的徽章。"
+  },
+  "visitSite": {
+    "message": "访问网站",
+    "description": "访问网站的按钮。"
+  },
+  "newRecommendations": {
+    "message": "新网站推荐",
+    "description": "AI推荐的新网站的标题。"
+  },
+  "verifying": {
+    "message": "验证中",
+    "description": "表示URL正在验证的徽章。"
+  },
+  "recommendationReason": {
+    "message": "推荐理由",
+    "description": "推荐项目理由的标签。"
+  },
+  "addToBookmarks": {
+    "message": "添加到收藏",
+    "description": "添加推荐网站的按钮。"
+  },
+  "practicalTips": {
+    "message": "实用技巧",
+    "description": "AI提供的一系列技巧的标题。"
+  },
+  "resetQA": {
+    "message": "新的提问",
+    "description": "重置问答界面的按钮。"
+  },
+  "addedToBookmarksToast": {
+    "message": "✅ 已添加到收藏：${title}",
+    "description": "提示消息。"
+  },
+  "alreadyExistsToast": {
+    "message": "⚠️ 该网站已在您的收藏中。",
+    "description": "提示消息。"
+  },
+  "addFailedToast": {
+    "message": "❌ 添加失败：${message}",
+    "description": "提示消息。"
+  },
+  "errorApiKeyMissing": {
+    "message": "未配置API密钥。请在选项中设置。",
+    "description": "后台错误。"
+  },
+  "contentExtractionFailed": {
+    "message": "无法从页面提取任何有效内容。",
+    "description": "后台错误。"
+  },
+  "errorApiKeyInvalid": {
+    "message": "AI服务配置错误。请检查您的API密钥。",
+    "description": "后台错误。"
+  },
+  "errorRateLimit": {
+    "message": "超出AI服务速率限制。请稍后重试。",
+    "description": "后台错误。"
+  },
+  "errorTimeout": {
+    "message": "请求AI服务超时。请检查您的网络。",
+    "description": "后台错误。"
+  },
+  "errorContentExtractionFailed": {
+    "message": "提取页面内容失败。该网站可能受保护。",
+    "description": "后台错误。"
+  },
+  "aiSummaryFailedFallback": {
+    "message": "无法生成摘要。请尝试重新生成。",
+    "description": "备用文本。"
+  },
+  "aiUncategorizedFallback": {
+    "message": "未分类",
+    "description": "备用文本。"
+  },
+  "aiDefaultTagFallback": {
+    "message": "网页",
+    "description": "备用文本。"
+  },
+  "keywordsLabel": {
+    "message": "关键词",
+    "description": "在元信息提取中使用的标签。"
+  }
 }
