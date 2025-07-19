@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>现有收藏按钮测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .improvement { background: #e8f5e8; padding: 10px; border-left: 4px solid #4caf50; margin: 10px 0; }
+        .test { background: #fff3e0; padding: 10px; border-left: 4px solid #ff9800; margin: 10px 0; }
+        .demo { background: #f0f8ff; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .mock-bookmark { margin: 8px 0; padding: 12px; background: white; border-radius: 4px; border-left: 4px solid #4caf50; border: 1px solid #e0e0e0; }
+        .button-group { margin-top: 10px; display: flex; gap: 8px; }
+        .visit-btn { background: #2e7d32; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .details-btn { background: #1976d2; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .badge { background: #4caf50; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; }
+        .category { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>现有收藏按钮功能测试</h1>
+    
+    <div class="test-section">
+        <h3>🎯 改进内容</h3>
+        
+        <div class="improvement">
+            <h4>新增功能：为现有收藏添加操作按钮</h4>
+            <p><strong>问题</strong>：之前"您的收藏中的相关内容"部分只显示信息，无法直接操作</p>
+            <p><strong>改进</strong>：添加了"访问网站"和"查看详情"按钮，提升用户体验</p>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>📋 新增的按钮功能</h3>
+        
+        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+            <tr style="background: #f5f5f5;">
+                <th style="padding: 10px; border: 1px solid #ddd;">按钮</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">功能</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">样式</th>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;">访问网站</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">在新标签页打开收藏的网站</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">绿色背景 (#2e7d32)</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;">查看详情</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">跳转到收藏列表并高亮显示该书签</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">蓝色背景 (#1976d2)</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="test-section">
+        <h3>🎨 界面效果预览</h3>
+        
+        <div class="demo">
+            <h4 style="color: #2e7d32; margin-top: 0;">📚 您的收藏中的相关内容：</h4>
+            
+            <div class="mock-bookmark">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <strong style="color: #333;">SmallPDF - PDF转PPT工具</strong>
+                    <span class="badge">✅ 已收藏</span>
+                </div>
+                <p style="margin: 8px 0; color: #666; font-size: 13px;">在线PDF转PPT工具，支持OCR识别扫描文件，保留原始格式</p>
+                <div style="margin: 8px 0;">
+                    <span class="category">PDF工具</span>
+                </div>
+                <div class="button-group">
+                    <button class="visit-btn" onclick="testVisit('https://smallpdf.com/pdf-to-ppt')">访问网站</button>
+                    <button class="details-btn" onclick="testDetails('smallpdf-id')">查看详情</button>
+                </div>
+            </div>
+            
+            <div class="mock-bookmark">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <strong style="color: #333;">iLovePDF - 免费PDF工具</strong>
+                    <span class="badge">✅ 已收藏</span>
+                </div>
+                <p style="margin: 8px 0; color: #666; font-size: 13px;">免费在线PDF处理工具集，支持多种格式转换</p>
+                <div style="margin: 8px 0;">
+                    <span class="category">文件转换</span>
+                </div>
+                <div class="button-group">
+                    <button class="visit-btn" onclick="testVisit('https://www.ilovepdf.com')">访问网站</button>
+                    <button class="details-btn" onclick="testDetails('ilovepdf-id')">查看详情</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>🧪 测试步骤</h3>
+        
+        <div class="test">
+            <h4>步骤1：重新加载扩展</h4>
+            <p>确保新的按钮功能生效</p>
+        </div>
+        
+        <div class="test">
+            <h4>步骤2：测试智能问答</h4>
+            <ol>
+                <li>打开智能问答</li>
+                <li>输入"pdf转ppt"（确保收藏夹中有相关网站）</li>
+                <li>查看"📚 您的收藏中的相关内容"部分</li>
+            </ol>
+        </div>
+        
+        <div class="test">
+            <h4>步骤3：测试按钮功能</h4>
+            <ul>
+                <li><strong>访问网站按钮</strong>：点击应该在新标签页打开网站</li>
+                <li><strong>查看详情按钮</strong>：点击应该关闭问答窗口并跳转到收藏列表</li>
+            </ul>
+        </div>
+        
+        <div class="test">
+            <h4>步骤4：验证事件委托</h4>
+            <p>按钮点击应该通过事件委托正常工作，无需刷新页面</p>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>📊 预期效果</h3>
+        
+        <div style="background: #f0f8ff; padding: 15px; border-radius: 8px;">
+            <h4>成功指标：</h4>
+            <ul>
+                <li>✅ "您的收藏中的相关内容"部分显示按钮</li>
+                <li>✅ "访问网站"按钮能正常打开网站</li>
+                <li>✅ "查看详情"按钮能跳转到收藏列表</li>
+                <li>✅ 按钮样式与其他部分保持一致</li>
+                <li>✅ 事件委托正常工作</li>
+            </ul>
+        </div>
+        
+        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin-top: 15px;">
+            <h4>与其他部分的区别：</h4>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr style="background: #f5f5f5;">
+                    <th style="padding: 8px; border: 1px solid #ddd;">部分</th>
+                    <th style="padding: 8px; border: 1px solid #ddd;">按钮1</th>
+                    <th style="padding: 8px; border: 1px solid #ddd;">按钮2</th>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">📚 您的收藏中的相关内容</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">访问网站 (绿色)</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">查看详情 (蓝色)</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">📚 您收藏中的相关网站</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">重新访问 (绿色)</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">查看详情 (蓝色)</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">🌟 新推荐网站</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">访问网站 (蓝色)</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">添加到收藏 (绿色)</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        function testVisit(url) {
+            console.log('测试访问网站:', url);
+            alert('模拟访问网站: ' + url);
+            // 在实际扩展中，这会调用 openUrl(url)
+        }
+        
+        function testDetails(bookmarkId) {
+            console.log('测试查看详情:', bookmarkId);
+            alert('模拟查看详情: ' + bookmarkId);
+            // 在实际扩展中，这会调用 showBookmarkDetails(bookmarkId)
+        }
+        
+        window.onload = function() {
+            console.log('现有收藏按钮测试页面加载完成');
+            console.log('请按照测试步骤验证按钮功能');
+        };
+    </script>
+</body>
+</html>

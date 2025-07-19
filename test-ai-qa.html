@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI问答功能测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+        textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin: 10px 0; }
+        .result { margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; }
+        .json-test { font-family: monospace; font-size: 12px; background: #f8f8f8; padding: 10px; border-radius: 4px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>AI问答功能测试</h1>
+    
+    <div class="test-section">
+        <h3>JSON解析测试</h3>
+        <p>测试各种可能的AI响应格式</p>
+        <button onclick="testJSONParsing()">测试JSON解析</button>
+        <div id="json-test-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>AI响应清理测试</h3>
+        <textarea id="ai-response-input" rows="10" placeholder="粘贴AI响应内容进行测试">```json
+{
+  "answer": "这是一个测试回答",
+  "recommendations": [
+    {
+      "title": "测试网站",
+      "url": "https://example.com",
+      "description": "这是一个测试网站",
+      "category": "测试",
+      "tags": ["测试", "示例"],
+      "why": "用于测试"
+    }
+  ],
+  "existingBookmarks": [],
+  "tips": ["测试建议1", "测试建议2"]
+}
+```</textarea>
+        <button onclick="testResponseCleaning()">测试响应清理</button>
+        <div id="cleaning-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>错误处理测试</h3>
+        <button onclick="testErrorHandling()">测试错误处理</button>
+        <div id="error-results"></div>
+    </div>
+
+    <script>
+        function testJSONParsing() {
+            const testCases = [
+                // 正常JSON
+                '{"answer": "正常回答", "recommendations": [], "existingBookmarks": [], "tips": []}',
+                
+                // 带代码块的JSON
+                '```json\n{"answer": "带代码块的回答", "recommendations": [], "existingBookmarks": [], "tips": []}\n```',
+                
+                // 带额外文本的JSON
+                '这是一些额外的文本\n```json\n{"answer": "带额外文本的回答", "recommendations": [], "existingBookmarks": [], "tips": []}\n```\n还有更多文本',
+                
+                // 不完整的JSON
+                '{"answer": "不完整的JSON", "recommendations": [',
+                
+                // 完全不是JSON
+                '这完全不是JSON格式的内容',
+                
+                // 空响应
+                '',
+                
+                // 只有代码块标记
+                '```json\n```'
+            ];
+            
+            const container = document.getElementById('json-test-results');
+            let html = '<h4>JSON解析测试结果:</h4>';
+            
+            testCases.forEach((testCase, index) => {
+                try {
+                    const result = cleanAndParseAIResponse(testCase);
+                    html += `<div class="result success">
+                        <strong>测试 ${index + 1}: ✅ 成功</strong>
+                        <div class="json-test">输入: ${testCase.substring(0, 100)}${testCase.length > 100 ? '...' : ''}
+输出: ${JSON.stringify(result, null, 2)}</div>
+                    </div>`;
+                } catch (error) {
+                    html += `<div class="result error">
+                        <strong>测试 ${index + 1}: ❌ 失败</strong>
+                        <div class="json-test">输入: ${testCase.substring(0, 100)}${testCase.length > 100 ? '...' : ''}
+错误: ${error.message}</div>
+                    </div>`;
+                }
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function testResponseCleaning() {
+            const input = document.getElementById('ai-response-input').value;
+            const container = document.getElementById('cleaning-results');
+            
+            try {
+                const result = cleanAndParseAIResponse(input);
+                container.innerHTML = `
+                    <div class="result success">
+                        <h4>✅ 清理和解析成功</h4>
+                        <div class="json-test">${JSON.stringify(result, null, 2)}</div>
+                    </div>
+                `;
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="result error">
+                        <h4>❌ 清理和解析失败</h4>
+                        <p><strong>错误:</strong> ${error.message}</p>
+                        <div class="json-test">原始输入: ${input}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        function testErrorHandling() {
+            const container = document.getElementById('error-results');
+            
+            // 模拟各种错误情况
+            const errorTests = [
+                { name: 'JSON解析错误', error: new Error('Unexpected token') },
+                { name: 'AI响应格式错误', error: new Error('AI响应格式错误') },
+                { name: '网络错误', error: new Error('Network error') }
+            ];
+            
+            let html = '<h4>错误处理测试结果:</h4>';
+            
+            errorTests.forEach(test => {
+                const fallbackResult = createFallbackResult('测试问题', test.error);
+                html += `
+                    <div class="result success">
+                        <strong>${test.name}: ✅ 已处理</strong>
+                        <div class="json-test">${JSON.stringify(fallbackResult, null, 2)}</div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // 模拟options.js中的清理函数
+        function cleanAndParseAIResponse(response) {
+            let cleanedResponse = response.trim();
+            
+            // 如果响应包含代码块标记，提取JSON部分
+            if (cleanedResponse.includes('```json')) {
+                const jsonStart = cleanedResponse.indexOf('```json') + 7;
+                const jsonEnd = cleanedResponse.indexOf('```', jsonStart);
+                if (jsonEnd > jsonStart) {
+                    cleanedResponse = cleanedResponse.substring(jsonStart, jsonEnd).trim();
+                }
+            } else if (cleanedResponse.includes('```')) {
+                const jsonStart = cleanedResponse.indexOf('```') + 3;
+                const jsonEnd = cleanedResponse.lastIndexOf('```');
+                if (jsonEnd > jsonStart) {
+                    cleanedResponse = cleanedResponse.substring(jsonStart, jsonEnd).trim();
+                }
+            }
+            
+            // 查找JSON对象的开始和结束
+            const jsonStart = cleanedResponse.indexOf('{');
+            const jsonEnd = cleanedResponse.lastIndexOf('}');
+            
+            if (jsonStart >= 0 && jsonEnd > jsonStart) {
+                cleanedResponse = cleanedResponse.substring(jsonStart, jsonEnd + 1);
+            }
+            
+            const aiResult = JSON.parse(cleanedResponse);
+            
+            // 验证必要字段
+            if (!aiResult.answer) {
+                throw new Error('AI响应缺少answer字段');
+            }
+            
+            return {
+                type: 'qa_result',
+                answer: aiResult.answer,
+                recommendations: aiResult.recommendations || [],
+                existingBookmarks: aiResult.existingBookmarks || [],
+                tips: aiResult.tips || []
+            };
+        }
+        
+        // 模拟错误处理函数
+        function createFallbackResult(question, error) {
+            return {
+                type: 'qa_result',
+                answer: `抱歉，AI问答功能暂时不可用。错误信息：${error.message}`,
+                recommendations: [
+                    {
+                        title: "Google搜索",
+                        url: "https://www.google.com/search?q=" + encodeURIComponent(question),
+                        description: "使用Google搜索您的问题",
+                        category: "搜索",
+                        tags: ["搜索", "通用"],
+                        why: "通用搜索引擎"
+                    }
+                ],
+                existingBookmarks: [],
+                tips: [
+                    "检查AI配置是否正确",
+                    "确保网络连接正常",
+                    "尝试重新提问"
+                ]
+            };
+        }
+        
+        // 页面加载时自动运行测试
+        window.onload = function() {
+            testJSONParsing();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>问答功能调试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 1000px; margin: 0 auto; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background: #f8f9fa; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+        textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin: 10px 0; }
+        .result { margin: 10px 0; padding: 10px; background: white; border: 1px solid #ddd; border-radius: 4px; }
+        .debug { font-family: monospace; font-size: 12px; color: #666; white-space: pre-wrap; }
+        .step { margin: 10px 0; padding: 10px; border-left: 4px solid #007bff; background: #f0f8ff; }
+    </style>
+</head>
+<body>
+    <h1>智能问答功能调试</h1>
+    
+    <div class="debug-section">
+        <h3>步骤1: 测试数据检查</h3>
+        <button onclick="checkTestData()">检查测试数据</button>
+        <div id="data-check"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>步骤2: 关键词提取测试</h3>
+        <input type="text" id="keyword-input" value="pdf转ppt" placeholder="输入测试文本">
+        <button onclick="testKeywordExtraction()">提取关键词</button>
+        <div id="keyword-result"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>步骤3: 搜索匹配测试</h3>
+        <input type="text" id="search-input" value="pdf转ppt" placeholder="输入搜索问题">
+        <button onclick="testSearchMatching()">测试搜索</button>
+        <div id="search-result"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>步骤4: 完整流程测试</h3>
+        <textarea id="full-test-input" rows="2" placeholder="输入完整测试问题">pdf怎么转成ppt</textarea>
+        <button onclick="testFullProcess()">完整测试</button>
+        <div id="full-result"></div>
+    </div>
+
+    <script>
+        // 测试数据
+        const testBookmarks = [
+            {
+                id: 'test-1',
+                type: 'bookmark',
+                title: 'PDF转PPT在线工具',
+                url: 'https://example.com/pdf-to-ppt',
+                summary: '这是一个免费的PDF转PPT在线工具，支持批量转换，保持原有格式。可以将PDF文档快速转换为PowerPoint演示文稿',
+                category: '工具',
+                tags: ['PDF', 'PPT', '转换', '在线工具', 'PowerPoint'],
+                keyPoints: ['支持批量转换', '保持格式', '免费使用', 'PDF转PPT', '文档转换'],
+                aiStatus: 'completed'
+            },
+            {
+                id: 'test-2', 
+                type: 'bookmark',
+                title: 'JavaScript学习指南',
+                url: 'https://example.com/js-guide',
+                summary: '完整的JavaScript学习教程，从基础到高级',
+                category: '编程',
+                tags: ['JavaScript', '编程', '教程'],
+                keyPoints: ['基础语法', '高级特性', '实战项目'],
+                aiStatus: 'completed'
+            },
+            {
+                id: 'test-3',
+                type: 'bookmark',
+                title: 'SmallPDF - PDF工具集',
+                url: 'https://smallpdf.com',
+                summary: '专业的PDF处理工具，包括PDF转Word、PDF转PPT、PDF转Excel等多种格式转换功能',
+                category: '工具',
+                tags: ['PDF', '转换', '文档处理', 'PPT', '格式转换'],
+                keyPoints: ['多格式转换', 'PDF转PPT', '在线处理', '免费试用'],
+                aiStatus: 'completed'
+            },
+            {
+                id: 'test-4',
+                type: 'bookmark',
+                title: 'Office办公技巧',
+                url: 'https://example.com/office-tips',
+                summary: 'Microsoft Office办公软件使用技巧，包括Word、Excel、PowerPoint的高级功能',
+                category: '办公',
+                tags: ['Office', 'PowerPoint', 'PPT', '办公技巧'],
+                keyPoints: ['PPT制作技巧', '模板使用', '动画效果'],
+                aiStatus: 'completed'
+            }
+        ];
+        
+        function checkTestData() {
+            const container = document.getElementById('data-check');
+            container.innerHTML = `
+                <div class="step">
+                    <h4>测试数据概览</h4>
+                    <p><strong>总数:</strong> ${testBookmarks.length} 条书签</p>
+                    <p><strong>书签类型数量:</strong> ${testBookmarks.filter(item => item.type === 'bookmark').length} 条</p>
+                </div>
+                <div class="debug">
+${testBookmarks.map((item, index) => `
+书签 ${index + 1}:
+  标题: ${item.title}
+  分类: ${item.category}
+  标签: ${item.tags.join(', ')}
+  关键点: ${item.keyPoints.join(', ')}
+  摘要: ${item.summary}
+`).join('\n')}
+                </div>
+            `;
+        }
+        
+        function extractKeywords(question) {
+            const stopWords = [
+                '的', '是', '在', '有', '和', '与', '或', '但', '如何', '什么', '为什么', '怎么', '怎样',
+                'how', 'what', 'why', 'when', 'where', 'the', 'is', 'are', 'and', 'or', 'but', 'to', 'a', 'an'
+            ];
+            
+            const synonyms = {
+                'pdf': ['pdf', 'PDF'],
+                'ppt': ['ppt', 'PPT', 'powerpoint', 'PowerPoint', '演示', '幻灯片'],
+                '转换': ['转换', '转成', '转为', '变成', '转化'],
+                '转成': ['转换', '转成', '转为', '变成', '转化']
+            };
+            
+            let keywords = question
+                .toLowerCase()
+                .replace(/[^\w\s\u4e00-\u9fff]/g, ' ')
+                .split(/\s+/)
+                .filter(word => word.length > 1 && !stopWords.includes(word));
+            
+            const expandedKeywords = [...keywords];
+            keywords.forEach(keyword => {
+                if (synonyms[keyword]) {
+                    expandedKeywords.push(...synonyms[keyword]);
+                }
+            });
+            
+            return [...new Set(expandedKeywords)];
+        }
+        
+        function testKeywordExtraction() {
+            const input = document.getElementById('keyword-input').value;
+            const keywords = extractKeywords(input);
+            
+            document.getElementById('keyword-result').innerHTML = `
+                <div class="step">
+                    <h4>关键词提取结果</h4>
+                    <p><strong>原始输入:</strong> "${input}"</p>
+                    <p><strong>提取的关键词:</strong> ${keywords.join(', ')}</p>
+                    <p><strong>关键词数量:</strong> ${keywords.length}</p>
+                </div>
+            `;
+        }
+        
+        function testSearchMatching() {
+            const question = document.getElementById('search-input').value;
+            const keywords = extractKeywords(question);
+            
+            let matchResults = [];
+            
+            testBookmarks.forEach(item => {
+                if (item.type !== 'bookmark') return;
+                
+                const searchText = [
+                    item.title || '',
+                    item.summary || '',
+                    item.category || '',
+                    ...(item.tags || []),
+                    ...(item.keyPoints || [])
+                ].join(' ').toLowerCase();
+                
+                const matchedKeywords = [];
+                const matches = keywords.some(keyword => {
+                    const keywordLower = keyword.toLowerCase();
+                    const found = searchText.includes(keywordLower);
+                    if (found) {
+                        matchedKeywords.push(keyword);
+                    }
+                    return found;
+                });
+                
+                matchResults.push({
+                    bookmark: item,
+                    matches: matches,
+                    matchedKeywords: matchedKeywords,
+                    searchText: searchText
+                });
+            });
+            
+            const matchedItems = matchResults.filter(r => r.matches);
+            
+            document.getElementById('search-result').innerHTML = `
+                <div class="step">
+                    <h4>搜索匹配结果</h4>
+                    <p><strong>搜索问题:</strong> "${question}"</p>
+                    <p><strong>关键词:</strong> ${keywords.join(', ')}</p>
+                    <p><strong>匹配数量:</strong> ${matchedItems.length} / ${testBookmarks.length}</p>
+                </div>
+                
+                <h5>匹配详情:</h5>
+                ${matchResults.map(result => `
+                    <div class="result ${result.matches ? 'success' : 'error'}">
+                        <strong>${result.bookmark.title}</strong> 
+                        ${result.matches ? '✅ 匹配' : '❌ 不匹配'}
+                        ${result.matches ? `<br><small>匹配的关键词: ${result.matchedKeywords.join(', ')}</small>` : ''}
+                        <div class="debug">搜索文本: ${result.searchText}</div>
+                    </div>
+                `).join('')}
+            `;
+        }
+        
+        function testFullProcess() {
+            const question = document.getElementById('full-test-input').value;
+            
+            // 步骤1: 提取关键词
+            const keywords = extractKeywords(question);
+            
+            // 步骤2: 搜索匹配
+            const matchedBookmarks = testBookmarks.filter(item => {
+                if (item.type !== 'bookmark') return false;
+                
+                const searchText = [
+                    item.title || '',
+                    item.summary || '',
+                    item.category || '',
+                    ...(item.tags || []),
+                    ...(item.keyPoints || [])
+                ].join(' ').toLowerCase();
+                
+                return keywords.some(keyword => 
+                    searchText.includes(keyword.toLowerCase())
+                );
+            });
+            
+            // 步骤3: 计算相关度
+            const scoredResults = matchedBookmarks.map(bookmark => {
+                let score = 0;
+                const weights = { title: 0.4, summary: 0.3, category: 0.2, tags: 0.2, keyPoints: 0.1 };
+                
+                keywords.forEach(keyword => {
+                    const lowerKeyword = keyword.toLowerCase();
+                    if ((bookmark.title || '').toLowerCase().includes(lowerKeyword)) score += weights.title;
+                    if ((bookmark.summary || '').toLowerCase().includes(lowerKeyword)) score += weights.summary;
+                    if ((bookmark.category || '').toLowerCase().includes(lowerKeyword)) score += weights.category;
+                    if ((bookmark.tags || []).some(tag => tag.toLowerCase().includes(lowerKeyword))) score += weights.tags;
+                    if ((bookmark.keyPoints || []).some(point => point.toLowerCase().includes(lowerKeyword))) score += weights.keyPoints;
+                });
+                
+                return { bookmark, score: Math.min(score, 1.0) };
+            }).filter(result => result.score > 0.1)
+              .sort((a, b) => b.score - a.score);
+            
+            document.getElementById('full-result').innerHTML = `
+                <div class="step">
+                    <h4>完整流程测试结果</h4>
+                    <p><strong>问题:</strong> "${question}"</p>
+                    <p><strong>关键词:</strong> ${keywords.join(', ')}</p>
+                    <p><strong>匹配书签:</strong> ${matchedBookmarks.length} 条</p>
+                    <p><strong>有效结果:</strong> ${scoredResults.length} 条</p>
+                </div>
+                
+                ${scoredResults.length > 0 ? `
+                    <h5>搜索结果:</h5>
+                    ${scoredResults.map(result => `
+                        <div class="result success">
+                            <strong>${result.bookmark.title}</strong>
+                            <span style="float: right; background: #007bff; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">
+                                ${Math.round(result.score * 100)}%
+                            </span>
+                            <br>
+                            <small>分类: ${result.bookmark.category} | 标签: ${result.bookmark.tags.join(', ')}</small>
+                            <br>
+                            <em>${result.bookmark.summary}</em>
+                        </div>
+                    `).join('')}
+                ` : `
+                    <div class="result error">
+                        <h5>❌ 没有找到匹配结果</h5>
+                        <p>可能的原因:</p>
+                        <ul>
+                            <li>关键词不匹配</li>
+                            <li>测试数据不包含相关内容</li>
+                            <li>搜索算法需要调整</li>
+                        </ul>
+                    </div>
+                `}
+            `;
+        }
+        
+        // 页面加载时自动运行检查
+        window.onload = function() {
+            checkTestData();
+            testKeywordExtraction();
+            testSearchMatching();
+            testFullProcess();
+        };
+    </script>
+</body>
+</html>

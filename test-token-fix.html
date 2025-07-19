@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token长度修复测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .problem { background: #ffebee; padding: 10px; border-left: 4px solid #f44336; margin: 10px 0; }
+        .solution { background: #e8f5e8; padding: 10px; border-left: 4px solid #4caf50; margin: 10px 0; }
+        .test { background: #fff3e0; padding: 10px; border-left: 4px solid #ff9800; margin: 10px 0; }
+        .code { background: #f5f5f5; padding: 10px; border-radius: 4px; font-family: monospace; margin: 10px 0; }
+        .token-info { background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <h1>Token长度修复测试</h1>
+    
+    <div class="test-section">
+        <h3>🐛 问题分析</h3>
+        
+        <div class="problem">
+            <h4>原问题：AI响应被截断</h4>
+            <p><strong>现象</strong>：JSON解析失败，错误信息显示在position 414处截断</p>
+            <p><strong>原因</strong>：<code>max_tokens: 512</code> 对智能问答场景不够用</p>
+        </div>
+        
+        <div class="token-info">
+            <h4>📊 Token需求分析</h4>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr style="background: #f5f5f5;">
+                    <th style="padding: 8px; border: 1px solid #ddd;">内容类型</th>
+                    <th style="padding: 8px; border: 1px solid #ddd;">预估Token</th>
+                    <th style="padding: 8px; border: 1px solid #ddd;">说明</th>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">AI回答</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">100-150</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">简短回答</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">3个推荐网站</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">300-450</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">每个100-150 tokens</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">JSON结构</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">50-100</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">括号、引号等</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">Tips建议</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">50-100</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">实用建议</td>
+                </tr>
+                <tr style="background: #fff3e0; font-weight: bold;">
+                    <td style="padding: 8px; border: 1px solid #ddd;">总计</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">500-800</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">实际需求</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>🔧 修复方案</h3>
+        
+        <div class="solution">
+            <h4>1. 动态Token分配</h4>
+            <div class="code">
+// 智能问答：1500 tokens
+if (prompt.includes('返回格式（只返回JSON')) {
+    maxTokens = 1500;
+}
+// 内容分析：800 tokens  
+else if (prompt.includes('总结')) {
+    maxTokens = 800;
+}
+// 默认：512 tokens
+else {
+    maxTokens = 512;
+}
+            </div>
+        </div>
+        
+        <div class="solution">
+            <h4>2. Token使用监控</h4>
+            <div class="code">
+console.log('Token使用情况:', {
+    completion_tokens: data.usage.completion_tokens,
+    max_tokens: maxTokens,
+    是否接近限制: completion_tokens / maxTokens > 0.9
+});
+            </div>
+        </div>
+        
+        <div class="solution">
+            <h4>3. 优化AI Prompt</h4>
+            <ul>
+                <li>强调"必须返回完整的JSON"</li>
+                <li>限制描述长度（不超过25字）</li>
+                <li>优先保证JSON完整性</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>🧪 测试步骤</h3>
+        
+        <div class="test">
+            <h4>步骤1：重新加载扩展</h4>
+            <p>确保新的token设置生效</p>
+        </div>
+        
+        <div class="test">
+            <h4>步骤2：打开开发者工具</h4>
+            <p>按F12，切换到Console标签，查看token使用日志</p>
+        </div>
+        
+        <div class="test">
+            <h4>步骤3：测试智能问答</h4>
+            <ol>
+                <li>打开智能问答</li>
+                <li>输入"pdf转ppt"</li>
+                <li>观察控制台输出</li>
+            </ol>
+        </div>
+        
+        <div class="test">
+            <h4>步骤4：检查Token使用情况</h4>
+            <p>在控制台查找类似这样的日志：</p>
+            <div class="code">
+Token使用情况: {
+    prompt_tokens: 245,
+    completion_tokens: 687,
+    total_tokens: 932,
+    max_tokens: 1500,
+    是否接近限制: false
+}
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>📊 预期结果</h3>
+        
+        <div style="background: #f0f8ff; padding: 15px; border-radius: 8px;">
+            <h4>成功指标：</h4>
+            <ul>
+                <li>✅ 不再出现JSON解析错误</li>
+                <li>✅ 控制台显示"检测到智能问答请求，使用更大的token限制: 1500"</li>
+                <li>✅ Token使用情况显示completion_tokens < max_tokens</li>
+                <li>✅ 返回完整的3个推荐网站</li>
+                <li>✅ JSON以正确的}结尾</li>
+            </ul>
+        </div>
+        
+        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin-top: 15px;">
+            <h4>如果仍有问题：</h4>
+            <ul>
+                <li>🔍 检查是否显示"⚠️ AI响应接近token限制"警告</li>
+                <li>🔍 查看completion_tokens是否接近max_tokens</li>
+                <li>🔍 如果需要，可以进一步增加maxTokens到2000</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>⚙️ 不同场景的Token配置</h3>
+        
+        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+            <tr style="background: #f5f5f5;">
+                <th style="padding: 10px; border: 1px solid #ddd;">使用场景</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">Token限制</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">适用情况</th>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;">智能问答</td>
+                <td style="padding: 10px; border: 1px solid #ddd; color: #4caf50; font-weight: bold;">1500</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">需要返回结构化JSON和多个推荐</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;">内容分析</td>
+                <td style="padding: 10px; border: 1px solid #ddd; color: #ff9800; font-weight: bold;">800</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">总结网页内容、提取关键点</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;">简单任务</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">512</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">简短回答、基本处理</td>
+            </tr>
+        </table>
+    </div>
+    
+    <script>
+        // 简单的token估算工具
+        function estimateTokens(text) {
+            // 粗略估算：英文约4字符=1token，中文约1.5字符=1token
+            const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+            const otherChars = text.length - chineseChars;
+            return Math.ceil(chineseChars / 1.5 + otherChars / 4);
+        }
+        
+        // 测试示例JSON的token估算
+        const sampleJSON = `{
+            "answer": "推荐以下支持OCR识别、多语言及高效转换的PDF转PPT工具：",
+            "recommendations": [
+                {
+                    "title": "PDF2Go",
+                    "url": "https://www.pdf2go.com/pdf-to-ppt",
+                    "description": "在线PDF转PPT工具，支持OCR识别扫描文件",
+                    "category": "文件转换",
+                    "tags": ["PDF转换", "OCR技术"],
+                    "why": "支持批量转换及格式保留"
+                },
+                {
+                    "title": "Zamzar",
+                    "url": "https://www.zamzar.com/convert/pdf-to-ppt",
+                    "description": "免费在线转换服务，支持多种格式",
+                    "category": "文件转换",
+                    "tags": ["格式转换", "免费工具"],
+                    "why": "操作简单，无需注册"
+                },
+                {
+                    "title": "SmallPDF",
+                    "url": "https://smallpdf.com/pdf-to-ppt",
+                    "description": "专业PDF工具集，转换质量高",
+                    "category": "PDF工具",
+                    "tags": ["PDF处理", "高质量"],
+                    "why": "转换质量优秀，界面友好"
+                }
+            ],
+            "existingBookmarks": [],
+            "tips": ["选择支持OCR的工具处理扫描文档", "转换后检查格式是否正确"]
+        }`;
+        
+        console.log('=== Token估算测试 ===');
+        console.log('示例JSON长度:', sampleJSON.length, '字符');
+        console.log('估算Token数:', estimateTokens(sampleJSON));
+        console.log('原Token限制:', 512);
+        console.log('新Token限制:', 1500);
+        console.log('是否足够:', estimateTokens(sampleJSON) < 1500 ? '✅ 足够' : '❌ 不够');
+        
+        window.onload = function() {
+            console.log('Token修复测试页面加载完成');
+            console.log('请按照测试步骤验证修复效果');
+        };
+    </script>
+</body>
+</html>
