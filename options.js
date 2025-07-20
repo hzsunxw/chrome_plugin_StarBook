@@ -56,7 +56,8 @@ function initOptions(i18n, currentLang) {
       category: '工具',
       tags: ['PDF', 'PPT', '转换', '在线工具', 'PowerPoint'],
       keyPoints: ['支持批量转换', '保持格式', '免费使用', 'PDF转PPT', '文档转换'],
-      aiStatus: 'completed'
+      aiStatus: 'completed',
+      notes: 'Test notes for item 1'
     },
     {
       id: 'test-2',
@@ -67,7 +68,8 @@ function initOptions(i18n, currentLang) {
       category: '编程',
       tags: ['JavaScript', '编程', '教程'],
       keyPoints: ['基础语法', '高级特性', '实战项目'],
-      aiStatus: 'completed'
+      aiStatus: 'completed',
+      notes: ''
     },
     {
       id: 'test-3',
@@ -78,7 +80,8 @@ function initOptions(i18n, currentLang) {
       category: '工具',
       tags: ['PDF', '转换', '文档处理', 'PPT', '格式转换'],
       keyPoints: ['多格式转换', 'PDF转PPT', '在线处理', '免费试用'],
-      aiStatus: 'completed'
+      aiStatus: 'completed',
+      notes: ''
     },
     {
       id: 'test-4',
@@ -89,7 +92,8 @@ function initOptions(i18n, currentLang) {
       category: '办公',
       tags: ['Office', 'PowerPoint', 'PPT', '办公技巧'],
       keyPoints: ['PPT制作技巧', '模板使用', '动画效果'],
-      aiStatus: 'completed'
+      aiStatus: 'completed',
+      notes: ''
     }
   ];
 
@@ -323,16 +327,43 @@ function initOptions(i18n, currentLang) {
   function handleListClick(event) {
     const target = event.target;
     const actionBtn = target.closest('.action-btn');
+
+    // 处理功能按钮（收藏、删除、刷新、备注）
     if (actionBtn) {
         const id = actionBtn.dataset.id;
         if (actionBtn.classList.contains('star')) handleStarToggle(id, actionBtn);
         if (actionBtn.classList.contains('delete-btn')) handleDelete(id);
         if (actionBtn.classList.contains('regenerate-btn')) handleRegenerateClick(id);
+
+        if (actionBtn.classList.contains('notes-btn')) {
+            const notesSection = document.getElementById(`notes-${id}`);
+            if (notesSection) {
+                const bookmark = allItems.find(b => b.id === id);
+                notesSection.querySelector('textarea').value = bookmark.notes || '';
+                notesSection.style.display = notesSection.style.display === 'block' ? 'none' : 'block';
+            }
+        }
+        return; 
+    }
+
+    const saveBtn = target.closest('.save-notes-btn');
+    if (saveBtn) {
+        const id = saveBtn.dataset.id;
+        const notesText = document.querySelector(`#notes-${id} textarea`).value;
+        handleSaveNotes(id, notesText);
         return;
     }
+
+    const cancelBtn = target.closest('.cancel-notes-btn');
+    if (cancelBtn) {
+        const id = cancelBtn.dataset.id;
+        document.getElementById(`notes-${id}`).style.display = 'none';
+        return;
+    }
+    
     const clickable = target.closest('.clickable');
     if (clickable) {
-      event.preventDefault(); // 阻止默认的链接行为
+      event.preventDefault(); 
       chrome.tabs.create({ url: clickable.dataset.url });
     }
   }
@@ -352,7 +383,6 @@ function initOptions(i18n, currentLang) {
   function handleStorageChange(changes) {
     if (changes.bookmarkItems) {
       allItems = changes.bookmarkItems.newValue || [];
-      // If the active folder no longer exists, switch to root
       if (!allItems.some(item => item.id === activeFolderId)) {
           activeFolderId = 'root';
       }
@@ -395,25 +425,15 @@ function initOptions(i18n, currentLang) {
         config.model = document.getElementById('openrouterModel').value;
     }
 
-    // 保存分析深度设置
     const analysisDepth = document.getElementById('aiAnalysisDepth').value;
-
-    // --- FIX STARTS HERE ---
-    // The 'enableSmartSearch' element does not exist in the HTML, so referencing it causes an error.
-    // These lines are removed to prevent the crash.
-    //
-    // const enableSmartSearch = document.getElementById('enableSmartSearch').checked;
-    // config.enableSmartSearch = enableSmartSearch;
-    // --- FIX ENDS HERE ---
 
     chrome.storage.local.set({
       aiConfig: config,
       aiAnalysisDepth: analysisDepth
     }, () => {
-      // Add a check for chrome.runtime.lastError to provide feedback on failure.
       if (chrome.runtime.lastError) {
         console.error("Error saving config:", chrome.runtime.lastError);
-        showToast(i18n.get("operationFailed"), 3000, "#ea4335"); // Use red for failure
+        showToast(i18n.get("operationFailed"), 3000, "#ea4335");
       } else {
         showToast(i18n.get('configSaved'));
       }
@@ -427,25 +447,12 @@ function initOptions(i18n, currentLang) {
         aiProvider.value = config.provider;
       }
       
-      // 设置分析深度
       const analysisDepth = data.aiAnalysisDepth || 'standard';
       const depthSelector = document.getElementById('aiAnalysisDepth');
       if (depthSelector) {
         depthSelector.value = analysisDepth;
       }
-
-      // --- FIX STARTS HERE ---
-      // The 'enableSmartSearch' element does not exist, so this block of code
-      // should also be removed for consistency and to prevent future errors.
-      //
-      // const enableSmartSearch = config.enableSmartSearch !== false; // 默认开启
-      // const smartSearchCheckbox = document.getElementById('enableSmartSearch');
-      // if (smartSearchCheckbox) {
-      //   smartSearchCheckbox.checked = enableSmartSearch;
-      // }
-      // --- FIX ENDS HERE ---
       
-      // 现有的API配置代码...
       document.getElementById('openaiKey').value = config.provider === 'openai' ? config.apiKey || '' : '';
       document.getElementById('openaiModel').value = config.provider === 'openai' ? config.model || 'gpt-4o' : 'gpt-4o';
       
@@ -495,7 +502,6 @@ function initOptions(i18n, currentLang) {
   // --- Context Menu Handlers ---
   function handleTreeContextMenu(event) {
     const target = event.target.closest('.tree-item');
-    // Only show context menu for actual folders, not special items like 'All Bookmarks'
     if (!target || target.dataset.type !== 'folder') {
         folderContextMenu.style.display = 'none';
         return;
@@ -518,8 +524,6 @@ function initOptions(i18n, currentLang) {
     const confirmationMessage = i18n.get('confirmDeleteFolder', { folderName: folderToDelete.title });
     
     if (confirm(confirmationMessage)) {
-      // The background action 'deleteBookmark' is generic and can delete any item by ID, 
-      // including folders and all their contents recursively.
       chrome.runtime.sendMessage({ action: "deleteBookmark", id: contextMenuFolderId }, response => {
         if (chrome.runtime.lastError || response?.status !== "success") {
           showToast(i18n.get("operationFailed"), 2000, "#ff4444");
@@ -528,7 +532,34 @@ function initOptions(i18n, currentLang) {
         }
       });
     }
-    contextMenuFolderId = null; // Reset after use
+    contextMenuFolderId = null; 
+  }
+
+  // --- 更新：保存备注的函数 ---
+  function handleSaveNotes(id, notes) {
+    const index = allItems.findIndex(item => item.id === id);
+    if (index !== -1) {
+      allItems[index].notes = notes;
+      
+      chrome.storage.local.set({ bookmarkItems: allItems }, () => {
+        if (chrome.runtime.lastError) {
+          showToast(i18n.get("operationFailed"), 2000, "#ff4444");
+        } else {
+          showToast(i18n.get('notesSaved'));
+          document.getElementById(`notes-${id}`).style.display = 'none';
+
+          // 动态更新按钮状态
+          const notesButton = document.querySelector(`.action-btn.notes-btn[data-id="${id}"]`);
+          if (notesButton) {
+              if (notes && notes.trim() !== '') {
+                  notesButton.classList.add('has-notes');
+              } else {
+                  notesButton.classList.remove('has-notes');
+              }
+          }
+        }
+      });
+    }
   }
 
 
@@ -556,18 +587,27 @@ function initOptions(i18n, currentLang) {
     return div;
   }
 
+  // --- 更新：创建书签元素的函数 ---
   function createBookmarkElement(bookmark) {
     const div = document.createElement('div');
     div.className = 'bookmark-item';
     const faviconUrl = getFaviconUrl(bookmark.url);
     const statusHTML = getStatusHTML(bookmark);
     
+    const hasNotes = bookmark.notes && bookmark.notes.trim() !== '';
+
     div.innerHTML = `
       <div class="bookmark-header">
         <img class="favicon" src="${faviconUrl}" width="16" height="16" loading="lazy" alt="">
         <div class="bookmark-title clickable" data-url="${bookmark.url}">${bookmark.title}</div>
         <div class="action-buttons">
           <button class="action-btn star ${bookmark.isStarred ? 'starred' : ''}" data-id="${bookmark.id}" title="${i18n.get('toggleStar')}">★</button>
+          <button class="action-btn notes-btn ${hasNotes ? 'has-notes' : ''}" data-id="${bookmark.id}" title="${i18n.get('editNotes')}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20">
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+              <path d="M0 0h24v24H0z" fill="none"/>
+            </svg>
+          </button>
           <button class="action-btn regenerate-btn" data-id="${bookmark.id}" title="${i18n.get('regenerateAI')}">🔄</button>
           <button class="action-btn delete-btn" data-id="${bookmark.id}" title="${i18n.get('delete')}">🗑</button>
         </div>
@@ -624,11 +664,18 @@ function initOptions(i18n, currentLang) {
           </div>
         ` : ''}
       ` : statusHTML}
+
+      <div class="notes-section" id="notes-${bookmark.id}">
+        <textarea placeholder="${i18n.get('notesPlaceholder')}">${bookmark.notes || ''}</textarea>
+        <div class="notes-actions">
+            <button class="save-notes-btn" data-id="${bookmark.id}">${i18n.get('save')}</button>
+            <button class="cancel-notes-btn" data-id="${bookmark.id}">${i18n.get('cancel')}</button>
+        </div>
+      </div>
       
       <div class="bookmark-date">${formatDate(bookmark.dateAdded)}</div>
     `;
     
-    // 添加标签点击事件监听器
     const tagElements = div.querySelectorAll('.tag[data-tag]');
     tagElements.forEach(tagEl => {
       tagEl.addEventListener('click', (e) => {

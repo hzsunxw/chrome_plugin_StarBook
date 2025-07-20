@@ -126,7 +126,7 @@ async function handleMessages(request, sendResponse) {
                         sendResponse({ status: "exists", message: chrome.i18n.getMessage("pageExists") });
                         break;
                     }
-                    const newBookmark = { id: crypto.randomUUID(), parentId: 'root', title: title || 'Untitled', url, dateAdded: new Date().toISOString(), type: 'bookmark', isStarred: false, category, summary, tags, aiStatus: 'pending' };
+                    const newBookmark = { id: crypto.randomUUID(), parentId: 'root', title: title || 'Untitled', url, dateAdded: new Date().toISOString(), type: 'bookmark', isStarred: false, category, summary, tags, aiStatus: 'pending', notes: '' };
                     bookmarkItems.unshift(newBookmark);
                     await chrome.storage.local.set({ bookmarkItems });
                     await enqueueTask(newBookmark.id);
@@ -171,7 +171,7 @@ async function handleMessages(request, sendResponse) {
                     if (node.url) {
                         if (node.url.startsWith('javascript:') || node.url.startsWith('chrome:')) return;
                         if (currentItems.some(item => item.url === node.url)) return;
-                        const newBookmark = { id: crypto.randomUUID(), parentId: extensionParentId, title: node.title || 'No Title', url: node.url, dateAdded: new Date(node.dateAdded || Date.now()).toISOString(), type: 'bookmark', isStarred: false, category: '', summary: '', aiStatus: 'pending' };
+                        const newBookmark = { id: crypto.randomUUID(), parentId: extensionParentId, title: node.title || 'No Title', url: node.url, dateAdded: new Date(node.dateAdded || Date.now()).toISOString(), type: 'bookmark', isStarred: false, category: '', summary: '', aiStatus: 'pending', notes: '' };
                         newItems.push(newBookmark);
                         return;
                     }
@@ -275,7 +275,7 @@ async function processBookmarkWithAI(bookmarkId) {
 async function handleAsyncBookmarkAction(action, data, tab) {
     if (action === "addCurrentPage") {
         const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
-        const newBookmark = { type: 'bookmark', url: tab.url, title: tab.title || 'Untitled', id: crypto.randomUUID(), parentId: data.parentId || 'root', dateAdded: new Date().toISOString(), isStarred: false, category: '', summary: '', aiStatus: 'pending' };
+        const newBookmark = { type: 'bookmark', url: tab.url, title: tab.title || 'Untitled', id: crypto.randomUUID(), parentId: data.parentId || 'root', dateAdded: new Date().toISOString(), isStarred: false, category: '', summary: '', aiStatus: 'pending', notes: '' };
         await chrome.storage.local.set({ bookmarkItems: [newBookmark, ...bookmarkItems] });
         await enqueueTask(newBookmark.id);
     }

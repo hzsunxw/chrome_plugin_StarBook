@@ -1,35 +1,27 @@
 {
   "extensionName": {
-    "message": "AI Smart Bookmarker",
+    "message": "Smart Bookmarker",
     "description": "The name of the extension."
   },
   "extensionDescription": {
-    "message": "Automatically categorize, summarize, and tag your bookmarks with AI. Provides smart search and Q&A capabilities.",
+    "message": "An intelligent bookmark management tool that uses AI to automatically categorize, summarize, and tag your bookmarks.",
     "description": "The description of the extension."
   },
-  "optionsTitle": {
-    "message": "Smart Bookmarker Settings",
-    "description": "Title for the options page."
-  },
-  "contextMenuTitle": {
-    "message": "Bookmark with AI",
-    "description": "The text for the right-click context menu item."
-  },
   "addCurrentPage": {
-    "message": "Add Current Page",
-    "description": "Button to add the current browser tab as a bookmark."
+    "message": "Bookmark Current Page",
+    "description": "Button text to add the current page as a bookmark."
   },
   "settings": {
-    "message": "Manage All",
-    "description": "Button to open the main options/management page."
+    "message": "Full List & Settings",
+    "description": "Button text to open the options page."
   },
   "allBookmarks": {
-    "message": "All Bookmarks",
-    "description": "Tab/label for showing all bookmarks."
+    "message": "All",
+    "description": "Tab title for all bookmarks."
   },
   "starredBookmarks": {
     "message": "Starred",
-    "description": "Tab/label for showing only starred bookmarks."
+    "description": "Tab title for starred bookmarks."
   },
   "noBookmarks": {
     "message": "No bookmarks yet. Add some!",
@@ -37,187 +29,129 @@
   },
   "processing": {
     "message": "Processing...",
-    "description": "A generic 'processing' status message."
-  },
-  "operationFailed": {
-    "message": "Operation failed",
-    "description": "A generic error message for a failed operation."
+    "description": "Toast message indicating an operation is in progress."
   },
   "taskQueued": {
-    "message": "AI analysis has been added to the queue.",
-    "description": "Notification that a new bookmark has been queued for AI processing."
+    "message": "AI analysis task has been queued.",
+    "description": "Toast message when a new bookmark is added and queued for AI processing."
   },
   "pageExists": {
-    "message": "This page is already in your bookmarks.",
-    "description": "Error message when trying to add a duplicate bookmark."
+    "message": "This page is already bookmarked.",
+    "description": "Toast message when trying to add a duplicate bookmark."
   },
   "noActiveTab": {
-    "message": "No active tab to bookmark.",
-    "description": "Error when the user tries to bookmark but there is no valid tab."
+    "message": "Could not find an active page to bookmark.",
+    "description": "Error message when no active tab is available."
+  },
+  "operationFailed": {
+    "message": "Operation failed. Please try again.",
+    "description": "Generic error message for a failed operation."
+  },
+  "aiProcessing": {
+    "message": "AI Analyzing...",
+    "description": "Status text for a bookmark being processed by AI."
+  },
+  "aiFailed": {
+    "message": "AI analysis failed.",
+    "description": "Status text when AI analysis has failed for a bookmark."
+  },
+  "optionsTitle": {
+    "message": "My Smart Bookmarks",
+    "description": "Title for the options page."
+  },
+  "importBookmarks": {
+    "message": "Import from Browser",
+    "description": "Button to import bookmarks from the browser."
+  },
+  "aiConfig": {
+    "message": "AI Configuration",
+    "description": "Button and modal title for AI settings."
+  },
+  "qaSystem": {
+    "message": "Smart Q&A",
+    "description": "Button and modal title for the Q&A system."
+  },
+  "searchPlaceholder": {
+    "message": "Search in title, summary, category, URL...",
+    "description": "Placeholder for the search input on the options page."
+  },
+  "close": {
+    "message": "Close",
+    "description": "Title for the close button on modals."
+  },
+  "aiProvider": {
+    "message": "AI Provider",
+    "description": "Label for the AI provider selector."
+  },
+  "apiKey": {
+    "message": "API Key",
+    "description": "Label for the API key input."
+  },
+  "model": {
+    "message": "Model",
+    "description": "Label for the AI model selector."
+  },
+  "saveConfig": {
+    "message": "Save Configuration",
+    "description": "Button to save AI configuration."
+  },
+  "configSaved": {
+    "message": "Configuration saved successfully!",
+    "description": "Toast message when AI config is saved."
+  },
+  "languageChanged": {
+    "message": "Language setting changed. Reloading...",
+    "description": "Toast message when language is changed."
+  },
+  "importSuccess": {
+    "message": "Successfully imported $count$ new bookmarks. AI analysis is in progress.",
+    "description": "Toast message for successful import.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "5"
+      }
+    }
+  },
+  "importFailed": {
+    "message": "Bookmark import failed.",
+    "description": "Toast message for failed import."
+  },
+  "importNoNew": {
+    "message": "No new bookmarks to import.",
+    "description": "Toast message when there are no new bookmarks to import."
   },
   "toggleStar": {
     "message": "Toggle Star",
     "description": "Tooltip for the star button."
   },
+  "regenerateAI": {
+    "message": "Regenerate AI Data",
+    "description": "Tooltip for the regenerate button."
+  },
   "delete": {
-    "message": "Delete",
+    "message": "Delete Bookmark",
     "description": "Tooltip for the delete button."
-  },
-  "minutes": {
-    "message": " min read",
-    "description": "Suffix for estimated reading time, e.g., '5 min read'."
-  },
-  "importBookmarks": {
-    "message": "Import from Browser",
-    "description": "Button to import existing browser bookmarks."
-  },
-  "aiConfig": {
-    "message": "AI Configuration",
-    "description": "Title for the AI settings section/modal."
-  },
-  "qaSystem": {
-    "message": "Smart Q&A",
-    "description": "Button/title for the intelligent Q&A system."
-  },
-  "searchPlaceholder": {
-    "message": "Search bookmarks... (e.g., 'tech | design' for OR)",
-    "description": "Placeholder text for the search input field."
-  },
-  "close": {
-    "message": "Close",
-    "description": "Tooltip for a close (X) button."
-  },
-  "aiProvider": {
-    "message": "AI Provider",
-    "description": "Label for the AI provider selection dropdown."
-  },
-  "analysisDepth": {
-    "message": "Analysis Depth",
-    "description": "Label for the AI analysis depth setting."
-  },
-  "analysisDepthBasic": {
-    "message": "Basic (Summary + Tags)",
-    "description": "Option for basic level of AI analysis."
-  },
-  "analysisDepthStandard": {
-    "message": "Standard (Recommended)",
-    "description": "Option for standard level of AI analysis."
-  },
-  "analysisDepthDetailed": {
-    "message": "Detailed (Incl. Key Points)",
-    "description": "Option for detailed level of AI analysis."
-  },
-  "analysisDepthHelp": {
-    "message": "Deeper analysis consumes more tokens.",
-    "description": "Help text for analysis depth setting."
-  },
-  "apiKey": {
-    "message": "API Key",
-    "description": "Label for the API key input field."
-  },
-  "model": {
-    "message": "Model",
-    "description": "Label for the AI model selection."
-  },
-  "saveConfig": {
-    "message": "Save Configuration",
-    "description": "Button to save AI settings."
-  },
-  "qaQuestionLabel": {
-    "message": "Your Question:",
-    "description": "Label for the Q&A question input text area."
-  },
-  "questionPlaceholder": {
-    "message": "e.g., recommend some free PDF to PPT tools",
-    "description": "Placeholder for the Q&A question input."
-  },
-  "askQuestion": {
-    "message": "Ask",
-    "description": "Button to submit a question in the Q&A system."
-  },
-  "deleteFolder": {
-    "message": "Delete Folder",
-    "description": "Context menu item to delete a folder."
-  },
-  "initializationError": {
-    "message": "Error: Could not load extension settings. Please try reloading the page.",
-    "description": "Error message if the options page fails to initialize."
   },
   "confirmDelete": {
     "message": "Are you sure you want to delete this bookmark?",
-    "description": "Confirmation prompt before deleting a single bookmark."
+    "description": "Confirmation message before deleting a bookmark."
   },
   "bookmarkDeleted": {
     "message": "Bookmark deleted.",
-    "description": "Toast message confirming a bookmark was deleted."
-  },
-  "languageChanged": {
-    "message": "Language changed. The page will now reload.",
-    "description": "Toast message when the UI language is changed."
-  },
-  "configSaved": {
-    "message": "Configuration saved successfully.",
-    "description": "Toast message confirming AI settings were saved."
-  },
-  "importFailed": {
-    "message": "Import failed. Please try again.",
-    "description": "Toast message for a failed bookmark import."
-  },
-  "importSuccess": {
-    "message": "Successfully imported ${count} new bookmarks.",
-    "description": "Toast message for a successful import."
-  },
-  "importNoNew": {
-    "message": "No new bookmarks to import.",
-    "description": "Toast message when there are no new bookmarks found during import."
+    "description": "Toast message when a bookmark is deleted."
   },
   "regenerateRequestSent": {
-    "message": "Request to regenerate AI data sent.",
-    "description": "Toast message when user requests AI re-analysis."
+    "message": "Request to regenerate AI data has been sent.",
+    "description": "Toast message when regenerate is clicked."
   },
   "taskAlreadyQueued": {
     "message": "This task is already in the queue.",
-    "description": "Toast message when trying to queue an already queued task."
+    "description": "Toast message for a task that is already queued."
   },
   "aiRegenerateStarted": {
-    "message": "AI regeneration has been queued.",
-    "description": "Toast confirming re-analysis has started."
-  },
-  "confirmDeleteFolder": {
-    "message": "Are you sure you want to delete the folder '${folderName}' and all of its contents? This cannot be undone.",
-    "description": "Confirmation prompt before deleting a folder and its contents."
-  },
-  "folderDeleted": {
-    "message": "Folder and its contents deleted.",
-    "description": "Toast confirming a folder was deleted."
-  },
-  "rootFolder": {
-    "message": "Bookmarks Bar",
-    "description": "The name for the root-level folder in the breadcrumb."
-  },
-  "searchResults": {
-    "message": "Search Results",
-    "description": "Breadcrumb text when showing search results."
-  },
-  "noMatchingBookmarks": {
-    "message": "No bookmarks match your search.",
-    "description": "Message shown when a search yields no results."
-  },
-  "folderEmpty": {
-    "message": "This folder is empty.",
-    "description": "Message shown when viewing an empty folder."
-  },
-  "regenerateAI": {
-    "message": "Regenerate AI Analysis",
-    "description": "Tooltip for the regenerate button."
-  },
-  "tagsMissing": {
-    "message": "AI analysis did not generate tags.",
-    "description": "Message shown if AI fails to produce tags."
-  },
-  "summaryMissing": {
-    "message": "AI analysis did not generate a summary.",
-    "description": "Message shown if AI fails to produce a summary."
+    "message": "AI regeneration process has started.",
+    "description": "Toast message when AI regeneration begins."
   },
   "keyPoints": {
     "message": "Key Points",
@@ -228,210 +162,170 @@
     "description": "Label for content type."
   },
   "readingTime": {
-    "message": "Reading Time",
+    "message": "Est. Read Time",
     "description": "Label for estimated reading time."
   },
   "readingLevel": {
     "message": "Reading Level",
-    "description": "Label for reading difficulty level."
+    "description": "Label for reading level."
   },
-  "readingLevel_beginner": { "message": "Beginner" },
-  "readingLevel_intermediate": { "message": "Intermediate" },
-  "readingLevel_advanced": { "message": "Advanced" },
+  "minutes": {
+    "message": " min",
+    "description": "Unit for minutes."
+  },
   "contentType_article": { "message": "Article" },
   "contentType_tutorial": { "message": "Tutorial" },
   "contentType_news": { "message": "News" },
   "contentType_reference": { "message": "Reference" },
   "contentType_tool": { "message": "Tool" },
   "contentType_entertainment": { "message": "Entertainment" },
-  "contentType_blog": { "message": "Blog" },
+  "contentType_blog": { "message": "Blog Post" },
   "contentType_documentation": { "message": "Documentation" },
-  "contentType_research": { "message": "Research Paper" },
-  "aiProcessing": {
-    "message": "AI is processing...",
-    "description": "Status text when AI analysis is in progress."
+  "contentType_research": { "message": "Research" },
+  "readingLevel_beginner": { "message": "Beginner" },
+  "readingLevel_intermediate": { "message": "Intermediate" },
+  "readingLevel_advanced": { "message": "Advanced" },
+  "rootFolder": {
+    "message": "All Bookmarks",
+    "description": "Breadcrumb text for the root folder."
   },
-  "aiFailed": {
-    "message": "AI analysis failed.",
-    "description": "Status text when AI analysis fails."
+  "searchResults": {
+    "message": "Search Results",
+    "description": "Breadcrumb text for search results."
   },
-  "qaMustEnterQuestion": {
-    "message": "Please enter a question.",
-    "description": "Alert when user clicks 'Ask' with no input."
+  "noMatchingBookmarks": {
+    "message": "No bookmarks match your search.",
+    "description": "Empty state text for search with no results."
   },
-  "qaSearchError": {
-    "message": "An error occurred during the search.",
-    "description": "Alert for a generic error in the Q&A system."
+  "folderEmpty": {
+    "message": "This folder is empty.",
+    "description": "Empty state text for an empty folder."
   },
-  "qaSearchingBookmarks": {
-    "message": "Searching your bookmarks...",
-    "description": "Loading message in Q&A panel."
+  "deleteFolder": {
+    "message": "Delete Folder",
+    "description": "Context menu item to delete a folder."
   },
-  "qaSystemTitle": {
-    "message": "Smart Q&A System",
-    "description": "Title of the Q&A panel."
-  },
-  "qaSystemDescription": {
-    "message": "Features:",
-    "description": "Header for the feature list in the Q&A panel."
-  },
-  "qaFeature1": { "message": "Answers questions based on your bookmarks" },
-  "qaFeature2": { "message": "Recommends relevant new websites" },
-  "qaFeature3": { "message": "Provides practical tips and tricks" },
-  "qaFeature4": { "message": "Helps you rediscover relevant saved content" },
-  "qaTip": {
-    "message": "Tip: Ask any question, and the AI will provide answers and recommendations based on your collection's profile.",
-    "description": "Help text in the Q&A panel."
-  },
-  "qaReasonRelated": {
-    "message": "A relevant site from your collection.",
-    "description": "AI reason for showing an existing bookmark."
-  },
-  "qaJsonParseError": {
-    "message": "The AI response was not in the correct format and could not be parsed.",
-    "description": "Error when AI response is not valid JSON."
-  },
-  "qaTipRetry": {
-    "message": "Try rephrasing your question.",
-    "description": "A tip for the user."
-  },
-  "qaTipCheckConfig": {
-    "message": "Check if your AI configuration is correct.",
-    "description": "A tip for the user."
-  },
-  "qaAiSearchError": {
-    "message": "Sorry, the AI Q&A feature is temporarily unavailable. Error: ${message}",
-    "description": "Error message for AI search failure."
-  },
-  "qaSearchGoogle": {
-    "message": "Search your question on Google.",
-    "description": "Fallback recommendation."
-  },
-  "qaSearchBaidu": {
-    "message": "Search your question on Baidu.",
-    "description": "Fallback recommendation."
-  },
-  "qaTruncatedError": {
-    "message": "Sorry, the AI response was incomplete. Please try again.",
-    "description": "Error for truncated JSON."
-  },
-  "qaTipRetryComplete": {
-    "message": "Please ask again to get a complete response.",
-    "description": "Tip for truncated JSON error."
-  },
-  "qaNoResults": {
-    "message": "Sorry, no relevant content was found in your bookmarks for: ${question}",
-    "description": "Message when Q&A search finds nothing."
-  },
-  "qaSuggestions": {
-    "message": "Suggestions",
-    "description": "Header for suggestions list."
-  },
-  "qaSuggestion1": { "message": "Try different keywords." },
-  "qaSuggestion2": { "message": "Bookmark more related websites." },
-  "qaSuggestion3": { "message": "Wait for AI analysis to complete and try again." },
-  "qaResultsFound": {
-    "message": "Found ${count} relevant results in your bookmarks:",
-    "description": "Header for Q&A search results."
-  },
-  "relevance": {
-    "message": "Relevance",
-    "description": "Label for relevance score."
-  },
-  "viewDetails": {
-    "message": "View Details",
-    "description": "Button text."
-  },
-  "aiAnswer": {
-    "message": "AI Answer",
-    "description": "Header for the AI's direct answer."
-  },
-  "relatedInBookmarks": {
-    "message": "Relevant Content in Your Bookmarks",
-    "description": "Header for existing bookmarks found by Q&A."
-  },
-  "alreadyBookmarked": {
-    "message": "Bookmarked",
-    "description": "Badge for an item that is already bookmarked."
-  },
-  "visitSite": {
-    "message": "Visit Site",
-    "description": "Button to visit a website."
-  },
-  "newRecommendations": {
-    "message": "New Website Recommendations",
-    "description": "Header for new sites recommended by AI."
-  },
-  "verifying": {
-    "message": "Verifying",
-    "description": "Badge indicating a URL is being verified."
-  },
-  "recommendationReason": {
-    "message": "Reason",
-    "description": "Label for why an item was recommended."
+  "confirmDeleteFolder": {
+    "message": "Are you sure you want to delete the folder '$folderName$' and all its contents? This action cannot be undone.",
+    "description": "Confirmation message before deleting a folder.",
+    "placeholders": {
+      "folderName": {
+        "content": "$1"
+      }
+    }
   },
   "addToBookmarks": {
     "message": "Add to Bookmarks",
-    "description": "Button to add a recommended site."
+    "description": "Button to add a recommended site to bookmarks."
+  },
+  "aiAnswer": {
+    "message": "AI Answer",
+    "description": "Header for the AI's answer in the Q&A modal."
+  },
+  "alreadyBookmarked": {
+    "message": "Bookmarked",
+    "description": "Label indicating a recommended site is already in the bookmarks."
+  },
+  "askQuestion": {
+    "message": "Ask",
+    "description": "Button text to submit a question in the Q&A modal."
+  },
+  "cancel": {
+    "message": "Cancel",
+    "description": "Button text for canceling an action."
+  },
+  "contextMenuTitle": {
+    "message": "Bookmark with Smart Bookmarker",
+    "description": "Title for the context menu item."
+  },
+  "editNotes": {
+    "message": "Edit Notes",
+    "description": "Tooltip for the button to edit notes."
+  },
+  "folderDeleted": {
+    "message": "Folder and its contents have been deleted.",
+    "description": "Toast message when a folder is deleted."
+  },
+  "newRecommendations": {
+    "message": "New Recommendations For You",
+    "description": "Header for new website recommendations in Q&A."
+  },
+  "notesPlaceholder": {
+    "message": "Enter your private notes here (e.g., account, password). They are stored locally and will not be uploaded.",
+    "description": "Placeholder text for the notes textarea."
+  },
+  "notesSaved": {
+    "message": "Notes saved successfully!",
+    "description": "Toast message shown after notes are saved."
   },
   "practicalTips": {
     "message": "Practical Tips",
-    "description": "Header for a list of tips from the AI."
+    "description": "Header for practical tips in Q&A."
+  },
+  "qaFeature1": {
+    "message": "Understand your questions in natural language.",
+    "description": "Feature 1 of the Q&A system."
+  },
+  "qaFeature2": {
+    "message": "Find the most relevant bookmarks you've saved.",
+    "description": "Feature 2 of the Q&A system."
+  },
+  "qaFeature3": {
+    "message": "Provide direct answers and summaries.",
+    "description": "Feature 3 of the Q&A system."
+  },
+  "qaFeature4": {
+    "message": "Recommend new websites based on your interests.",
+    "description": "Feature 4 of the Q&A system."
+  },
+  "qaQuestionLabel": {
+    "message": "My Question:",
+    "description": "Label for the question input text area in the Q&A modal."
+  },
+  "qaSearchingBookmarks": {
+    "message": "Searching your bookmarks...",
+    "description": "Loading message shown after a question is asked."
+  },
+  "qaSystemDescription": {
+    "message": "This system helps you find answers and recommendations based on your bookmarks. It can:",
+    "description": "A short description of what the Q&A system does."
+  },
+  "qaSystemTitle": {
+    "message": "Welcome to Smart Q&A",
+    "description": "The main title for the Q&A system info box."
+  },
+  "qaTip": {
+    "message": "Tip: Try asking things like 'How to learn JavaScript?' or 'Recommend some design tools.'",
+    "description": "A helpful tip for users on what to ask."
+  },
+  "questionPlaceholder": {
+    "message": "Enter your question, e.g., 'tools for PDF to PPT'",
+    "description": "Placeholder text for the question input in the Q&A modal."
+  },
+  "recommendationReason": {
+    "message": "Reason",
+    "description": "Label for the reason why a site is recommended."
+  },
+  "relatedInBookmarks": {
+    "message": "Related in Your Bookmarks",
+    "description": "Header for existing bookmarks related to the Q&A."
   },
   "resetQA": {
-    "message": "New Search",
-    "description": "Button to reset the Q&A interface."
+    "message": "Ask Another Question",
+    "description": "Button to reset the Q&A interface to ask a new question."
   },
-  "addedToBookmarksToast": {
-    "message": "✅ Added to bookmarks: ${title}",
-    "description": "Toast message."
+  "save": {
+    "message": "Save",
+    "description": "Button text for saving."
   },
-  "alreadyExistsToast": {
-    "message": "⚠️ This site is already in your bookmarks.",
-    "description": "Toast message."
+  "summaryMissing": { "message": "Summary not generated." },
+  "tagsMissing": { "message": "Tags not generated." },
+  "verifying": {
+    "message": "Verifying",
+    "description": "Label indicating a recommended URL is being verified."
   },
-  "addFailedToast": {
-    "message": "❌ Add failed: ${message}",
-    "description": "Toast message."
-  },
-  "errorApiKeyMissing": {
-    "message": "API key is not configured. Please set it in the options.",
-    "description": "Background error."
-  },
-  "contentExtractionFailed": {
-    "message": "Could not extract any meaningful content from the page.",
-    "description": "Background error."
-  },
-  "errorApiKeyInvalid": {
-    "message": "AI service configuration error. Please check your API key.",
-    "description": "Background error."
-  },
-  "errorRateLimit": {
-    "message": "AI service rate limit exceeded. Please try again later.",
-    "description": "Background error."
-  },
-  "errorTimeout": {
-    "message": "Request to AI service timed out. Please check your network.",
-    "description": "Background error."
-  },
-  "errorContentExtractionFailed": {
-    "message": "Failed to extract page content. The site may be protected.",
-    "description": "Background error."
-  },
-  "aiSummaryFailedFallback": {
-    "message": "Summary could not be generated. Please try regenerating.",
-    "description": "Fallback text."
-  },
-  "aiUncategorizedFallback": {
-    "message": "Uncategorized",
-    "description": "Fallback text."
-  },
-  "aiDefaultTagFallback": {
-    "message": "web-page",
-    "description": "Fallback text."
-  },
-  "keywordsLabel": {
-    "message": "Keywords",
-    "description": "Label used in meta info extraction."
+  "visitSite": {
+    "message": "Visit Site",
+    "description": "Button to visit a recommended website."
   }
 }

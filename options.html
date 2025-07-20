@@ -498,6 +498,73 @@
     .context-menu li:hover {
       background-color: var(--bg-color);
     }
+
+    /* --- 备注功能样式 (已更新) --- */
+    /* 备注按钮 SVG 的默认样式 (无备注时) */
+    .action-btn.notes-btn svg {
+      fill: #BDBDBD; /* 灰色 */
+      transition: fill 0.2s;
+    }
+
+    /* 备注按钮悬停时 SVG 的样式 (无备注时) */
+    .action-btn.notes-btn:hover svg {
+      fill: #9E9E9E;
+    }
+
+    /* 当按钮有 .has-notes 类时 (有备注时) SVG 的样式 */
+    .action-btn.notes-btn.has-notes svg {
+      fill: #f57f17; /* 琥珀色 */
+    }
+    
+    /* 当按钮有 .has-notes 类时悬停的样式 */
+    .action-btn.notes-btn.has-notes:hover svg {
+      fill: #ff9800;
+    }
+
+    .notes-section {
+      display: none; /* 默认隐藏 */
+      margin-top: 12px;
+      padding: 12px;
+      background-color: #fffde7; /* 淡黄色背景，提示敏感信息 */
+      border-left: 4px solid #fbc02d;
+      border-radius: 4px;
+    }
+
+    .notes-section textarea {
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 70px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 8px;
+      font-family: inherit;
+      resize: vertical;
+    }
+
+    .notes-actions {
+      margin-top: 8px;
+      text-align: right;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .notes-actions button {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .notes-actions .save-notes-btn {
+      background-color: #4CAF50; /* 绿色保存按钮 */
+    }
+    .notes-actions .save-notes-btn:hover {
+      background-color: #45a049;
+    }
+    .notes-actions .cancel-notes-btn {
+      background-color: #757575; /* 灰色取消按钮 */
+    }
+    .notes-actions .cancel-notes-btn:hover {
+      background-color: #616161;
+    }
   </style>
 </head>
 <body>
