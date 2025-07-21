@@ -22,6 +22,8 @@ function initOptions(i18n, currentLang) {
   let allItems = [];
   let activeFolderId = 'root';
   let contextMenuFolderId = null; // To store the ID of the right-clicked folder
+  let currentEditingBookmarkId = null; // <-- Add this variable
+
   const langKey = currentLang.startsWith('zh') ? 'zh_CN' : 'en';
 
   const langData = {
@@ -111,12 +113,21 @@ function initOptions(i18n, currentLang) {
   // Context Menu Elements
   const folderContextMenu = document.getElementById('folder-context-menu');
   const deleteFolderBtn = document.getElementById('delete-folder-btn');
+  const notesEditModal = document.getElementById('notesEditModal'); // <-- Add this
+  const closeNotesModal = document.getElementById('closeNotesModal'); // <-- Add this
+  const saveNotesBtn = document.getElementById('saveNotesBtn');       // <-- Add this
+  const cancelNotesBtn = document.getElementById('cancelNotesBtn');   // <-- Add this
+  const notesEditTextarea = document.getElementById('notesEditTextarea'); // <-- Add this
+  const notesEditTitle = document.getElementById('notesEditTitle');     // <-- Add this
 
   // 检查关键元素是否存在
   if (!importBtn || !searchInput || !languageSelector || !folderTreeContainer || !bookmarkListContainer) {
     throw new Error('Critical DOM elements not found');
   }
 
+  closeNotesModal.addEventListener('click', closeTheNotesModal);
+  cancelNotesBtn.addEventListener('click', closeTheNotesModal);
+  saveNotesBtn.addEventListener('click', handleSaveNotes); // Note this doesn't take params anymore
 
   // --- Event Listeners ---
   importBtn.addEventListener('click', handleImportBookmarks);
@@ -284,6 +295,19 @@ function initOptions(i18n, currentLang) {
       });
   }
 
+  function openNotesModal(bookmark) {
+    currentEditingBookmarkId = bookmark.id; // Store the ID
+    notesEditTitle.textContent = bookmark.title; // Show bookmark title in modal
+    notesEditTextarea.value = bookmark.notes || ''; // Populate textarea
+    notesEditModal.style.display = 'block'; // Show the modal
+    notesEditTextarea.focus();
+  }
+
+  function closeTheNotesModal() {
+    notesEditModal.style.display = 'none';
+    currentEditingBookmarkId = null; // Reset the ID
+  }  
+
   function handleSearch() {
       const query = searchInput.value.toLowerCase().trim();
       if (!query) {
@@ -336,6 +360,13 @@ function initOptions(i18n, currentLang) {
         if (actionBtn.classList.contains('regenerate-btn')) handleRegenerateClick(id);
 
         if (actionBtn.classList.contains('notes-btn')) {
+            const bookmark = allItems.find(b => b.id === id);
+            if (bookmark) {
+                openNotesModal(bookmark); // Call new function to open modal
+            }
+        }
+
+        if (actionBtn.classList.contains('notes-btn')) {
             const notesSection = document.getElementById(`notes-${id}`);
             if (notesSection) {
                 const bookmark = allItems.find(b => b.id === id);
@@ -343,9 +374,19 @@ function initOptions(i18n, currentLang) {
                 notesSection.style.display = notesSection.style.display === 'block' ? 'none' : 'block';
             }
         }
+
+        // --- 新增：处理学习助手按钮点击 ---
+        if (actionBtn.classList.contains('assistant-btn')) {
+            const bookmark = allItems.find(b => b.id === id);
+            if(bookmark) {
+                showToast("正在打开学习助手...", 2000);
+                chrome.runtime.sendMessage({ action: "openLearningAssistant", bookmark: bookmark });
+            }
+        }
+
         return; 
     }
-
+/*
     const saveBtn = target.closest('.save-notes-btn');
     if (saveBtn) {
         const id = saveBtn.dataset.id;
@@ -360,7 +401,7 @@ function initOptions(i18n, currentLang) {
         document.getElementById(`notes-${id}`).style.display = 'none';
         return;
     }
-    
+    */
     const clickable = target.closest('.clickable');
     if (clickable) {
       event.preventDefault(); 
@@ -536,32 +577,33 @@ function initOptions(i18n, currentLang) {
   }
 
   // --- 更新：保存备注的函数 ---
-  function handleSaveNotes(id, notes) {
-    const index = allItems.findIndex(item => item.id === id);
+  function handleSaveNotes() {
+    if (!currentEditingBookmarkId) return;
+
+    const notes = notesEditTextarea.value;
+    const index = allItems.findIndex(item => item.id === currentEditingBookmarkId);
+
     if (index !== -1) {
       allItems[index].notes = notes;
-      
+
       chrome.storage.local.set({ bookmarkItems: allItems }, () => {
         if (chrome.runtime.lastError) {
           showToast(i18n.get("operationFailed"), 2000, "#ff4444");
         } else {
           showToast(i18n.get('notesSaved'));
-          document.getElementById(`notes-${id}`).style.display = 'none';
+          closeTheNotesModal(); // Close modal on success
 
-          // 动态更新按钮状态
-          const notesButton = document.querySelector(`.action-btn.notes-btn[data-id="${id}"]`);
-          if (notesButton) {
-              if (notes && notes.trim() !== '') {
-                  notesButton.classList.add('has-notes');
-              } else {
-                  notesButton.classList.remove('has-notes');
-              }
+          // Re-render the specific bookmark item to update the button state
+          const oldBookmarkElement = document.querySelector(`.bookmark-item[data-id="${currentEditingBookmarkId}"]`);
+          if (oldBookmarkElement) {
+            const newBookmarkElement = createBookmarkElement(allItems[index]);
+            newBookmarkElement.dataset.id = currentEditingBookmarkId; // Ensure it has the data-id for future queries
+            oldBookmarkElement.parentNode.replaceChild(newBookmarkElement, oldBookmarkElement);
           }
         }
       });
     }
   }
-
 
   // --- Helper Functions ---
   function createTreeItem(item, level, count) {
@@ -596,12 +638,16 @@ function initOptions(i18n, currentLang) {
     
     const hasNotes = bookmark.notes && bookmark.notes.trim() !== '';
 
+    // 学习助手SVG图标
+    const assistantIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px" fill="#6a1b9a"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></svg>`;
+
     div.innerHTML = `
       <div class="bookmark-header">
         <img class="favicon" src="${faviconUrl}" width="16" height="16" loading="lazy" alt="">
         <div class="bookmark-title clickable" data-url="${bookmark.url}">${bookmark.title}</div>
         <div class="action-buttons">
           <button class="action-btn star ${bookmark.isStarred ? 'starred' : ''}" data-id="${bookmark.id}" title="${i18n.get('toggleStar')}">★</button>
+          <button class="action-btn assistant-btn" data-id="${bookmark.id}" title="${i18n.get('learningAssistant')}">${assistantIconSVG}</button>          
           <button class="action-btn notes-btn ${hasNotes ? 'has-notes' : ''}" data-id="${bookmark.id}" title="${i18n.get('editNotes')}">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20">
               <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
@@ -664,14 +710,6 @@ function initOptions(i18n, currentLang) {
           </div>
         ` : ''}
       ` : statusHTML}
-
-      <div class="notes-section" id="notes-${bookmark.id}">
-        <textarea placeholder="${i18n.get('notesPlaceholder')}">${bookmark.notes || ''}</textarea>
-        <div class="notes-actions">
-            <button class="save-notes-btn" data-id="${bookmark.id}">${i18n.get('save')}</button>
-            <button class="cancel-notes-btn" data-id="${bookmark.id}">${i18n.get('cancel')}</button>
-        </div>
-      </div>
       
       <div class="bookmark-date">${formatDate(bookmark.dateAdded)}</div>
     `;

@@ -565,6 +565,30 @@
     .notes-actions .cancel-notes-btn:hover {
       background-color: #616161;
     }
+    /* 用于包裹输入框和其下方的帮助文本 */
+    .form-row {
+      margin-bottom: 10px;
+    }
+
+    /* 让原来的 input-group 不再有底部边距，由 .form-row 控制 */
+    .form-row .input-group {
+      margin-bottom: 0;
+    }
+
+    /* 帮助文本容器的样式 */
+    .help-text-container {
+      /* 关键：通过左边距让帮助文本与上方的输入框左侧对齐 */
+      /* 计算方式：label宽度(130px) + label右边距(10px) = 140px */
+      padding-left: 140px; 
+      margin-top: 5px; /* 与上方输入框的间距 */
+    }
+    
+    /* 帮助文本本身的样式 */
+    .help-text-container .help-text {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.4;
+    }  
   </style>
 </head>
 <body>
@@ -612,16 +636,20 @@
           </select>
         </div>
         
-        <div class="input-group">
-          <label for="aiAnalysisDepth" data-i18n="analysisDepth"></label>
-          <select id="aiAnalysisDepth">
-            <option value="basic" data-i18n="analysisDepthBasic"></option>
-            <option value="standard" data-i18n="analysisDepthStandard"></option>
-            <option value="detailed" data-i18n="analysisDepthDetailed"></option>
-          </select>
-          <small class="help-text" data-i18n="analysisDepthHelp"></small>
+        <div class="form-row">
+          <div class="input-group">
+            <label for="aiAnalysisDepth" data-i18n="analysisDepth"></label>
+            <select id="aiAnalysisDepth">
+              <option value="basic" data-i18n="analysisDepthBasic"></option>
+              <option value="standard" data-i18n="analysisDepthStandard"></option>
+              <option value="detailed" data-i18n="analysisDepthDetailed"></option>
+            </select>
+          </div>
+          <div class="help-text-container">
+            <small class="help-text" data-i18n="analysisDepthHelp"></small>
+          </div>
         </div>
-        
+
         <div id="openaiConfig">
           <div class="input-group">
             <label for="openaiKey" data-i18n="apiKey"></label>
@@ -681,6 +709,23 @@
           <button id="askQuestion" data-i18n="askQuestion"></button>
         </div>
         <div class="qa-info" style="margin-top: 15px; padding: 15px; background: #f0f8ff; border-radius: 8px; font-size: 14px; min-height: 100px;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="notesEditModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div class="config-modal" style="width: 600px;">
+      <div class="config-header">
+        <h2 data-i18n="editNotes">Edit Notes</h2>
+        <button id="closeNotesModal" class="close-btn" title="Close">&times;</button>
+      </div>
+      <div class="config-form">
+        <p id="notesEditTitle" style="font-weight: bold; margin-bottom: 10px;"></p>
+        <textarea id="notesEditTextarea" style="width: 100%; min-height: 150px; box-sizing: border-box; padding: 8px; font-family: inherit; resize: vertical; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+        <div style="text-align: right; margin-top: 15px;">
+          <button id="saveNotesBtn" data-i18n="save" style="background-color: #4CAF50;"></button>
+          <button id="cancelNotesBtn" data-i18n="cancel" style="background-color: #757575;"></button>
         </div>
       </div>
     </div>

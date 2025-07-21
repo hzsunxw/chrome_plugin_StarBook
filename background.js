@@ -1,3 +1,6 @@
+const isSidePanelSupported = typeof chrome.sidePanel !== 'undefined';
+console.log(`Side Panel API Supported: ${isSidePanelSupported}`);
+
 // --- Task Queue Configuration ---
 let taskQueue = []; // Now stores only bookmark IDs
 let isProcessingQueue = false;
@@ -70,15 +73,138 @@ async function recoverStuckTasks() {
 
 // --- Message Listener ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    handleMessages(request, sendResponse);
+    handleMessages(request, sender, sendResponse);
     return true; // Indicates async response
 });
 
-async function handleMessages(request, sendResponse) {
+async function handleMessages(request, sender, sendResponse) {
     try {
         const { action, id, data } = request;
 
-        switch (action) {
+        switch (action) {            
+            // --- 新增：处理来自 options.js 的请求，打开学习助手 ---
+            case 'openLearningAssistant': {
+                const { bookmark } = request;
+                if (!bookmark || !bookmark.url) {
+                    sendResponse({ status: "error", message: "Invalid bookmark data" });
+                    return;
+                }
+
+                const tab = await chrome.tabs.create({ url: bookmark.url });
+                await chrome.storage.session.set({ [tab.id]: bookmark.id });
+
+                if (isSidePanelSupported) {
+                    // --- 方案二：Side Panel 逻辑 ---
+                    await chrome.sidePanel.setOptions({ tabId: tab.id, path: 'sidepanel.html', enabled: true });
+                    await chrome.sidePanel.open({ tabId: tab.id });
+                    console.log(`Opened side panel for tab ${tab.id}`);
+                } else {
+                    // --- 方案一：后备逻辑 ---
+                    console.log(`Using fallback mode for tab ${tab.id}`);
+                    // 依赖 onUpdated 监听器来注入脚本
+                }
+                sendResponse({ status: "opening" });
+                break;
+            }
+            case 'getBookmarkIdForCurrentTab': {
+                const tabId = sender.tab?.id;
+                if (tabId) {
+                    const data = await chrome.storage.session.get(tabId.toString());
+                    sendResponse({ bookmarkId: data[tabId] });
+                } else { // 请求可能来自没有 tabId 的 sidepanel
+                    const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+                    if (activeTab) {
+                        const data = await chrome.storage.session.get(activeTab.id.toString());
+                        sendResponse({ bookmarkId: data[activeTab.id] });
+                    } else {
+                        sendResponse({ bookmarkId: null });
+                    }
+                }
+                break;
+            }
+
+            // --- 新增：处理来自内容脚本的问答请求 ---
+            case 'askAboutBookmarkInTab': {
+                const { bookmarkId, question } = request;
+                const { bookmarkItems = [], aiConfig } = await chrome.storage.local.get(["bookmarkItems", "aiConfig"]);
+                const bookmark = bookmarkItems.find(b => b.id === bookmarkId);
+
+                // ... (此部分前面的 if 判断保持不变)
+                if (!bookmark) {
+                    sendResponse({ error: "书签数据未找到。" });
+                    return;
+                }
+                if (!aiConfig || !aiConfig.apiKey) {
+                    sendResponse({ error: chrome.i18n.getMessage("errorApiKeyMissing") });
+                    return;
+                }
+                
+                const pageContent = await getPageContent(bookmark.url);
+                if (!pageContent || pageContent.trim().length < 50) {
+                    sendResponse({ error: "无法获取足够的内容进行问答。" });
+                    return;
+                }
+
+                const prompt = `你是一个严谨的AI问答助手。请严格根据下面提供的“上下文”来回答用户的问题。\n\n### 上下文:\n${pageContent.substring(0, 8000)}\n\n### 用户的问题:\n${question}\n\n### 你的要求:\n- 你的回答必须完全基于上述“上下文”。\n- 如果“上下文”中没有足够信息来回答问题，请明确指出：“根据所提供的文章内容，无法回答这个问题。”\n- 回答应直接、简洁。`;
+                                
+                const answer = await callAI(aiConfig, prompt);
+
+                // [已修改] 在这里增加对 answer 的校验
+                if (answer && answer.trim() !== '') {
+                    sendResponse({ answer: answer });
+                } else {
+                    sendResponse({ error: "AI未能返回有效的回答，可能遇到了临时问题，请稍后再试。" });
+                }
+                
+                break;
+            }
+
+            // --- 新增：处理来自内容脚本的测验生成请求 ---
+            case 'generateQuizInTab': {
+                const { bookmarkId } = request; // <-- THIS IS THE FIX. Add this line.
+                
+                // The rest of the code in this block can now find and use bookmarkId
+                const { bookmarkItems = [], aiConfig } = await chrome.storage.local.get(["bookmarkItems", "aiConfig"]);
+                const bookmark = bookmarkItems.find(b => b.id === bookmarkId);
+
+                if (!bookmark) {
+                    sendResponse({ error: "书签数据未找到。" });
+                    return;
+                }
+                if (!aiConfig || !aiConfig.apiKey) {
+                    sendResponse({ error: chrome.i18n.getMessage("errorApiKeyMissing") });
+                    return;
+                }
+                
+                // ... the rest of the function remains the same ...
+                const pageContent = await getPageContent(bookmark.url);
+                 if (!pageContent || pageContent.trim().length < 100) {
+                    sendResponse({ error: "无法获取足够的内容生成测验。" });
+                    return;
+                }
+
+                const prompt = `你是一个优秀的学习导师。请仔细阅读以下“文本内容”，并从中提炼出3到5个最重要的核心知识点，设计成一个学习测验。\n\n### 文本内容:\n${pageContent.substring(0, 8000)}\n\n### 你的任务:\n1. 创建3-5个问题，可以是选择题或简答题。\n2. 确保问题能有效检验对文本核心内容的理解。\n3. 返回一个包含 "quiz" 列表的JSON对象。每个问题对象应包含 "question" (问题), "type" (类型: '选择题' 或 '简答题'), "options" (选择题选项数组，简答题则为空数组), 和 "answer" (答案)。\n\n### JSON格式示例:\n{"quiz": [{"question": "React Hooks 的主要目的是什么？","type": "选择题","options": ["A. 样式化组件","B. 在函数组件中使用 state 和其他 React 特性","C. 路由管理"],"answer": "B. 在函数组件中使用 state 和其他 React 特性"}]}\n\n### 关键指令:\n你的回答必须是且仅是一个完整的、语法正确的JSON对象。不要在JSON代码块前后添加任何额外的文字、解释或注释。如果无法根据内容生成有意义的测验，请必须返回一个包含空列表的JSON对象：{"quiz": []}`;
+
+                try {
+                    const quizDataStr = await callAI(aiConfig, prompt);
+                    const jsonMatch = quizDataStr.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        const parsedJson = JSON.parse(jsonMatch[0]);
+                        if (parsedJson && parsedJson.quiz) {
+                            sendResponse({ quiz: parsedJson.quiz });
+                        } else {
+                            throw new Error("AI返回的JSON中缺少'quiz'字段。");
+                        }
+                    } else {
+                        throw new Error("在AI的返回内容中未找到有效的JSON对象。");
+                    }
+                } catch (e) {
+                    console.error("生成或解析测验失败:", e);
+                    sendResponse({ error: "AI返回格式错误，无法解析测验内容。" });
+                }
+                break;
+            }
+
             case 'addCurrentPage': {
                 const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
                 const currentTab = tabs[0];
@@ -212,6 +338,36 @@ async function handleMessages(request, sendResponse) {
         sendResponse({ status: 'error', message: e.message });
     }
 }
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    // 只有在不支持 Side Panel 时才执行重新注入逻辑
+    if (!isSidePanelSupported && changeInfo.status === 'complete') {
+        const data = await chrome.storage.session.get(tabId.toString());
+        const bookmarkId = data[tabId];
+        if (bookmarkId) {
+            console.log(`Fallback mode: Re-injecting script for tab ${tabId}`);
+            try {
+                await chrome.scripting.insertCSS({ target: { tabId: tabId }, files: ['learningAssistant.css'] });
+                await chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['learningAssistant.js'] });
+            } catch(e) { /* Catch errors if tab is protected */ }
+        }
+    }
+});
+
+// 当用户切换标签页时，通知 side panel 更新
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+    if (isSidePanelSupported) {
+        const data = await chrome.storage.session.get(activeInfo.tabId.toString());
+        const bookmarkId = data[activeInfo.tabId];
+        // 发送消息让 side panel 根据新的 tabId 更新其状态
+        chrome.runtime.sendMessage({ action: 'updateSidePanel', bookmarkId: bookmarkId || null });
+    }
+});
+
+chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+    chrome.storage.session.remove(tabId.toString());
+    console.log(`Cleaned up session storage for closed tab ${tabId}.`);
+});
 
 // --- Task Processing ---
 async function processTaskQueue() {
@@ -387,7 +543,6 @@ function getAnalysisPrompt(targetLanguage, analysisDepth, contentStats, truncate
     const langStats = contentStats.chineseCharCount > 20 ? p.lang_stats_zh : p.lang_stats_en;
     return `${promptTemplate}\n\n${p.title}:\n- ${p.req1}\n- ${p.req2}\n- ${p.req3}\n- ${p.req4}\n- ${p.req5}\n\n${p.reading_time_title}:\n- ${p.content_stats} ${langStats}\n- ${isChinese ? p.speed_zh : p.speed_en}\n- ${p.adjustments}\n- ${p.range}\n\nContent: "${truncatedContent}"\nURL: "${url}"`;
 }
-
 
 async function callAI(aiConfig, prompt) {
     let apiUrl, body;

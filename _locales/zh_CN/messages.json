@@ -327,5 +327,69 @@
   "visitSite": {
     "message": "访问网站",
     "description": "访问一个推荐网站的按钮。"
+  },
+  "analysisDepth": {
+    "message": "分析深度",
+    "description": "AI分析深度选择下拉菜单的标签。"
+  },
+  "analysisDepthBasic": {
+    "message": "基础 (摘要和标签)",
+    "description": "AI分析深度的“基础”选项。"
+  },
+  "analysisDepthStandard": {
+    "message": "标准 (基础 + 分类和要点)",
+    "description": "AI分析深度的“标准”选项。"
+  },
+  "analysisDepthDetailed": {
+    "message": "详细 (标准 + 内容类型、阅读难度等)",
+    "description": "AI分析深度的“详细”选项。"
+  },
+  "analysisDepthHelp": {
+    "message": "更深度的分析会提供更丰富的细节，但会消耗更多的API额度。",
+    "description": "解释分析深度利弊的帮助文本。"
+  },
+  "learningAssistantFallbackTitle": {
+    "message": "🎓 学习助手 (后备模式)",
+    "description": "学习助手作为后备方案注入时的面板标题。"
+  },
+  "askAboutArticle": {
+    "message": "针对本文提问：",
+    "description": "提问输入区域的标签。"
+  },
+  "qaInputPlaceholder": {
+    "message": "例如：文中提到的核心算法是什么？",
+    "description": "问题输入框的占位文本。"
+  },
+  "askButton": {
+    "message": "提问",
+    "description": "提交问题的按钮文本。"
+  },
+  "analyzingAndThinking": {
+    "message": "🤖 正在分析文章并思考答案...",
+    "description": "等待问题回答时显示的加载信息。"
+  },
+  "errorPrefix": {
+    "message": "错误",
+    "description": "错误信息的前缀。"
+  },
+  "generateQuiz": {
+    "message": "生成学习测验：",
+    "description": "测验生成区域的标签。"
+  },
+  "generateQuizButton": {
+    "message": "点击生成3-5个关键问题",
+    "description": "生成测验的按钮文本。"
+  },
+  "readingAndQuizzing": {
+    "message": "🤖 正在阅读文章并为您出题...",
+    "description": "生成测验时显示的加载信息。"
+  },
+  "viewAnswer": {
+    "message": "查看答案",
+    "description": "用于展开显示测验答案的 details/summary 元素的文本。"
+  },
+  "learningAssistant": {
+    "message": "学习助手",
+    "description": "学习助手按钮的工具提示。"
   }
 }

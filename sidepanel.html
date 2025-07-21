@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="learningAssistant.css">
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+        }
+        /* 针对 sidepanel 的一些微调 */
+        #learning-assistant-panel {
+            position: static;
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            font-size: 13px;
+        }
+        #la-header {
+            cursor: default;
+        }
+    </style>
+</head>
+<body>
+    <div id="learning-assistant-panel">
+        <div id="la-header">
+            <h4>🎓 学习助手</h4>
+        </div>
+        <div id="la-content">
+            <div id="assistant-placeholder"><p>请从选项页的书签列表中打开一个学习助手。</p></div>
+            <div id="assistant-main" style="display: none;">
+                <div class="la-section">
+                    <strong>针对本文提问:</strong>
+                    <div class="la-input-group">
+                        <textarea id="la-qa-input" placeholder="例如：文中提到的核心算法是什么？" rows="2"></textarea>
+                        <button id="la-ask-btn">提问</button>
+                    </div>
+                    <div id="la-qa-answer" class="la-answer-area"></div>
+                </div>
+                <div class="la-section">
+                    <strong>生成学习测验:</strong>
+                    <button id="la-quiz-btn">点击生成3-5个关键问题</button>
+                    <div id="la-quiz-content" class="la-answer-area"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="sidepanel.js"></script>
+</body>
+</html>

@@ -327,5 +327,69 @@
   "visitSite": {
     "message": "Visit Site",
     "description": "Button to visit a recommended website."
+  },
+  "analysisDepth": {
+    "message": "Analysis Depth",
+    "description": "Label for the AI analysis depth selection dropdown."
+  },
+  "analysisDepthBasic": {
+    "message": "Basic (Summary & Tags)",
+    "description": "The 'Basic' option for AI analysis depth."
+  },
+  "analysisDepthStandard": {
+    "message": "Standard (Basic + Category & Key Points)",
+    "description": "The 'Standard' option for AI analysis depth."
+  },
+  "analysisDepthDetailed": {
+    "message": "Detailed (Standard + Content Type, Reading Level, etc.)",
+    "description": "The 'Detailed' option for AI analysis depth."
+  },
+  "analysisDepthHelp": {
+    "message": "Deeper analysis provides more details but consumes more API quota.",
+    "description": "Help text explaining the trade-off of analysis depth."
+  },
+  "learningAssistantFallbackTitle": {
+    "message": "🎓 Learning Assistant (Fallback Mode)",
+    "description": "Title for the learning assistant panel when injected as a fallback."
+  },
+  "askAboutArticle": {
+    "message": "Ask about this article:",
+    "description": "Label for the question input section."
+  },
+  "qaInputPlaceholder": {
+    "message": "e.g., What is the core algorithm mentioned in the text?",
+    "description": "Placeholder text for the question textarea."
+  },
+  "askButton": {
+    "message": "Ask",
+    "description": "Text for the button that submits a question."
+  },
+  "analyzingAndThinking": {
+    "message": "🤖 Analyzing the article and thinking of an answer...",
+    "description": "Loading message shown while waiting for a question's answer."
+  },
+  "errorPrefix": {
+    "message": "Error",
+    "description": "Prefix for error messages."
+  },
+  "generateQuiz": {
+    "message": "Generate a learning quiz:",
+    "description": "Label for the quiz generation section."
+  },
+  "generateQuizButton": {
+    "message": "Click to generate 3-5 key questions",
+    "description": "Text for the button that generates a quiz."
+  },
+  "readingAndQuizzing": {
+    "message": "🤖 Reading the article and preparing questions for you...",
+    "description": "Loading message shown while generating a quiz."
+  },
+  "viewAnswer": {
+    "message": "View Answer",
+    "description": "Text for the details/summary element to reveal a quiz answer."
+  },
+  "learningAssistant": {
+    "message": "Learning Assistant",
+    "description": "Tooltip for the Learning Assistant button."
   }
 }
