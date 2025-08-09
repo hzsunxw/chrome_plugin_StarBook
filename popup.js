@@ -151,74 +151,89 @@ function initPopup(i18n) {
     });
   }
 
-  function createBookmarkElement(bookmark) {
-    const div = document.createElement('div');
-    div.className = 'bookmark-item';
-    const faviconUrl = getFaviconUrl(bookmark.url);
-    const statusHTML = getStatusHTML(bookmark);
-    
-    let html = `
-      <img class="favicon" src="${faviconUrl}" width="16" height="16" loading="lazy" alt="">
-      <div class="bookmark-info">
-        <div class="bookmark-title clickable" data-url="${bookmark.url}">${bookmark.title}</div>
-        <div class="bookmark-url clickable" data-url="${bookmark.url}">${bookmark.url}</div>
-    `;
-    
-    // 显示增强的AI分析结果
-    if (bookmark.aiStatus === 'completed') {
-      // 主分类
-      if (bookmark.category) {
-        html += `<div class="bookmark-category">${bookmark.category}</div>`;
-      }
+  /**
+   * Creates and returns the HTML element for a single bookmark item for the popup window.
+   * This function provides a compact view, showing essential information and primary actions.
+   *
+   * @param {object} bookmark - The bookmark object containing its data.
+   * @returns {HTMLElement} A div element representing the bookmark for the popup.
+   */
+    function createBookmarkElement(bookmark) {
+      const div = document.createElement('div');
+      div.className = 'bookmark-item';
       
-      // 标签（在弹窗中只显示前3个）
-      if (bookmark.tags && bookmark.tags.length > 0) {
-        const displayTags = bookmark.tags.slice(0, 3);
-        html += `<div class="bookmark-tags-popup">
-          ${displayTags.map(tag => `<span class="tag-popup" data-tag="${tag}">${tag}</span>`).join('')}
-          ${bookmark.tags.length > 3 ? `<span class="tag-more">+${bookmark.tags.length - 3}</span>` : ''}
-        </div>`;
-      }
+      const faviconUrl = getFaviconUrl(bookmark.url); // Dependency
+      const statusHTML = getStatusHTML(bookmark);   // Dependency
       
-      // 摘要
-      if (bookmark.summary) {
-        html += `<div class="bookmark-summary">${bookmark.summary}</div>`;
-      }
+      // The main HTML structure for the popup bookmark item.
+      let html = `
+        <img class="favicon" src="${faviconUrl}" width="16" height="16" loading="lazy" alt="">
+        <div class="bookmark-info">
+          <div class="bookmark-title clickable" data-url="${bookmark.url}">${bookmark.title}</div>
+          <div class="bookmark-url clickable" data-url="${bookmark.url}">${bookmark.url}</div>
+      `;
       
-      // 内容类型和阅读时间（紧凑显示）
-      if (bookmark.contentType || bookmark.estimatedReadTime) {
-        html += `<div class="bookmark-meta">`;
-        if (bookmark.contentType) {
-          html += `<span class="meta-item">${i18n.get('contentType_' + bookmark.contentType) || bookmark.contentType}</span>`;
+      // Display enhanced AI analysis results if completed.
+      if (bookmark.aiStatus === 'completed') {
+        // Main category
+        if (bookmark.category) {
+          html += `<div class="bookmark-category">${bookmark.category}</div>`;
         }
-        if (bookmark.estimatedReadTime) {
-          html += `<span class="meta-item">${bookmark.estimatedReadTime}${i18n.get('minutes')}</span>`;
+        
+        // Tags (only show the first 3 in the popup)
+        if (bookmark.tags && bookmark.tags.length > 0) {
+          const displayTags = bookmark.tags.slice(0, 3);
+          html += `<div class="bookmark-tags-popup">
+            ${displayTags.map(tag => `<span class="tag-popup" data-tag="${tag}">${tag}</span>`).join('')}
+            ${bookmark.tags.length > 3 ? `<span class="tag-more">+${bookmark.tags.length - 3}</span>` : ''}
+          </div>`;
         }
-        html += `</div>`;
+        
+        // Summary
+        if (bookmark.summary) {
+          html += `<div class="bookmark-summary">${bookmark.summary}</div>`;
+        }
+        
+        // Content type, read time, and reading level (compact display)
+        if (bookmark.contentType || bookmark.estimatedReadTime || bookmark.readingLevel) {
+          html += `<div class="bookmark-meta">`;
+          if (bookmark.contentType) {
+            html += `<span class="meta-item">${i18n.get('contentType_' + bookmark.contentType) || bookmark.contentType}</span>`;
+          }
+          if (bookmark.estimatedReadTime) {
+            html += `<span class="meta-item">${bookmark.estimatedReadTime}${i18n.get('minutes')}</span>`;
+          }
+          if (bookmark.readingLevel) {
+            html += `<span class="meta-item">${i18n.get('readingLevel_' + bookmark.readingLevel) || bookmark.readingLevel}</span>`;
+          }
+          html += `</div>`;
+        }
+      } else {
+        // If AI analysis is not complete, show the status (e.g., "Processing...").
+        html += statusHTML;
       }
-    } else {
-      html += statusHTML;
-    }
-    
-    html += `
-        <div class="bookmark-date">${formatDate(bookmark.dateAdded)}</div>
-      </div>
-      <div class="star ${bookmark.isStarred ? 'starred' : ''}" data-id="${bookmark.id}">★</div>
-    `;
-    
-    div.innerHTML = html;
-    
-    // 添加标签点击事件监听器
-    const tagElements = div.querySelectorAll('.tag-popup[data-tag]');
-    tagElements.forEach(tagEl => {
-      tagEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // 可以添加标签搜索功能
-        console.log('Tag clicked:', tagEl.dataset.tag);
+      
+      // --- KEY CHANGE ---
+      // The star button's identifier is set to the stable `clientId`.
+      html += `
+          <div class="bookmark-date">${formatDate(bookmark.dateAdded)}</div>
+        </div>
+        <div class="star ${bookmark.isStarred ? 'starred' : ''}" data-id="${bookmark.clientId}">★</div>
+      `;
+      
+      div.innerHTML = html;
+      
+      // Add event listeners to tag elements.
+      const tagElements = div.querySelectorAll('.tag-popup[data-tag]');
+      tagElements.forEach(tagEl => {
+        tagEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // In a real implementation, this could trigger a search in the main options page.
+          console.log('Tag clicked:', tagEl.dataset.tag);
+        });
       });
-    });
-    
-    return div;
+      
+      return div;
   }
 
   // --- Utility Functions ---

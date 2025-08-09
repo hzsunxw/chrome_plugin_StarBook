@@ -52,6 +52,21 @@
         const answerDiv = document.getElementById('la-qa-answer');
         if (!question.trim()) return;
         answerDiv.innerHTML = `<p>${chrome.i18n.getMessage("analyzingAndThinking")}</p>`;
+
+        chrome.runtime.sendMessage({ action: "askAboutBookmarkInTab", bookmarkId: bookmarkId, question: question }, response => {
+            // Check for multiple possible error indicators
+            if (chrome.runtime.lastError || response.error || response.status === 'error') {
+                // Use the first available error message
+                const errorMessage = response?.error || response?.message || chrome.runtime.lastError.message;
+                answerDiv.innerHTML = `<p style="color: red;">${chrome.i18n.getMessage("errorPrefix")}: ${errorMessage}</p>`;
+            } else {
+                const p = document.createElement('p');
+                p.innerText = response.answer;
+                answerDiv.innerHTML = '';
+                answerDiv.appendChild(p);
+            }
+        });
+          /*
         chrome.runtime.sendMessage({ action: "askAboutBookmarkInTab", bookmarkId: bookmarkId, question: question }, response => {
              if (chrome.runtime.lastError || response.error) {
                 answerDiv.innerHTML = `<p style="color: red;">${chrome.i18n.getMessage("errorPrefix")}: ${response?.error || chrome.runtime.lastError.message}</p>`;
@@ -61,7 +76,7 @@
                 answerDiv.innerHTML = '';
                 answerDiv.appendChild(p);
             }
-        });
+        }); */
     });
 
     // 生成测验按钮逻辑

@@ -296,7 +296,8 @@ function initOptions(i18n, currentLang) {
   }
 
   function openNotesModal(bookmark) {
-    currentEditingBookmarkId = bookmark.id; // Store the ID
+    currentEditingBookmarkId = bookmark.clientId; //
+
     notesEditTitle.textContent = bookmark.title; // Show bookmark title in modal
     notesEditTextarea.value = bookmark.notes || ''; // Populate textarea
     notesEditModal.style.display = 'block'; // Show the modal
@@ -348,66 +349,68 @@ function initOptions(i18n, currentLang) {
       }
   }
   
+  /**
+   * Handles all click events within the main bookmark list container.
+   * It delegates actions like starring, deleting, opening notes, etc., to their respective functions.
+   *
+   * @param {Event} event - The click event object.
+   */
   function handleListClick(event) {
-    const target = event.target;
-    const actionBtn = target.closest('.action-btn');
+      const target = event.target;
+      const actionBtn = target.closest('.action-btn');
 
-    // 处理功能按钮（收藏、删除、刷新、备注）
-    if (actionBtn) {
-        const id = actionBtn.dataset.id;
-        if (actionBtn.classList.contains('star')) handleStarToggle(id, actionBtn);
-        if (actionBtn.classList.contains('delete-btn')) handleDelete(id);
-        if (actionBtn.classList.contains('regenerate-btn')) handleRegenerateClick(id);
+      // Handle clicks on action buttons (star, delete, regenerate, notes, assistant)
+      if (actionBtn) {
+          const id = actionBtn.dataset.id; // This 'id' is correctly retrieved as the clientId.
+          if (actionBtn.classList.contains('star')) {
+              handleStarToggle(id, actionBtn);
+          }
+          if (actionBtn.classList.contains('delete-btn')) {
+              handleDelete(id);
+          }
+          if (actionBtn.classList.contains('regenerate-btn')) {
+              handleRegenerateClick(id);
+          }
+          if (actionBtn.classList.contains('notes-btn')) {
+              // --- KEY CHANGE ---
+              // Find the bookmark in the `allItems` array using its `clientId`.
+              // The original code `find(b => b.id === id)` is now incorrect.
+              const bookmark = allItems.find(b => b.clientId === id);
+              if (bookmark) {
+                  openNotesModal(bookmark); // Call the function to open the notes modal
+              }
+          }
 
-        if (actionBtn.classList.contains('notes-btn')) {
-            const bookmark = allItems.find(b => b.id === id);
-            if (bookmark) {
-                openNotesModal(bookmark); // Call new function to open modal
-            }
-        }
+          // Handle the click for the learning assistant button
+          if (actionBtn.classList.contains('assistant-btn')) {
+              // Also find the bookmark by its `clientId` here.
+              const bookmark = allItems.find(b => b.clientId === id);
+              if (bookmark) {
+                  showToast("正在打开学习助手...", 2000);
+                  chrome.runtime.sendMessage({ action: "openLearningAssistant", bookmark: bookmark });
+              }
+          }
 
-        if (actionBtn.classList.contains('notes-btn')) {
-            const notesSection = document.getElementById(`notes-${id}`);
-            if (notesSection) {
-                const bookmark = allItems.find(b => b.id === id);
-                notesSection.querySelector('textarea').value = bookmark.notes || '';
-                notesSection.style.display = notesSection.style.display === 'block' ? 'none' : 'block';
-            }
-        }
+          return; // Stop further processing after an action button is handled.
+      }
 
-        // --- 新增：处理学习助手按钮点击 ---
-        if (actionBtn.classList.contains('assistant-btn')) {
-            const bookmark = allItems.find(b => b.id === id);
-            if(bookmark) {
-                showToast("正在打开学习助手...", 2000);
-                chrome.runtime.sendMessage({ action: "openLearningAssistant", bookmark: bookmark });
-            }
-        }
+      /*
+      The commented-out code for inline notes editing is no longer used, 
+      as the logic has been moved to a modal.
+      
+      const saveBtn = target.closest('.save-notes-btn');
+      if (saveBtn) { ... }
+      const cancelBtn = target.closest('.cancel-notes-btn');
+      if (cancelBtn) { ... }
+      */
 
-        return; 
-    }
-/*
-    const saveBtn = target.closest('.save-notes-btn');
-    if (saveBtn) {
-        const id = saveBtn.dataset.id;
-        const notesText = document.querySelector(`#notes-${id} textarea`).value;
-        handleSaveNotes(id, notesText);
-        return;
-    }
-
-    const cancelBtn = target.closest('.cancel-notes-btn');
-    if (cancelBtn) {
-        const id = cancelBtn.dataset.id;
-        document.getElementById(`notes-${id}`).style.display = 'none';
-        return;
-    }
-    */
-    const clickable = target.closest('.clickable');
-    if (clickable) {
-      event.preventDefault(); 
-      chrome.tabs.create({ url: clickable.dataset.url });
-    }
-  }
+      // Handle clicks on the main bookmark area to open the link in a new tab.
+      const clickable = target.closest('.clickable');
+      if (clickable) {
+          event.preventDefault();
+          chrome.tabs.create({ url: clickable.dataset.url });
+      }
+  }  
 
   function handleDelete(id) {
     if (confirm(i18n.get('confirmDelete'))) {
@@ -577,6 +580,32 @@ function initOptions(i18n, currentLang) {
   }
 
   // --- 更新：保存备注的函数 ---
+  // options.js
+
+// --- 更新：保存备注的函数 ---
+  function handleSaveNotes() {
+    if (!currentEditingBookmarkId) return;
+
+    const notes = notesEditTextarea.value;
+    
+    // 核心修改：不直接操作本地存储，而是发送消息给 background.js
+    // 让 background.js 作为唯一的数据修改和同步发起者
+    chrome.runtime.sendMessage({
+        action: 'updateBookmarkNotes', // 这是发送给 background.js 的指令
+        id: currentEditingBookmarkId,
+        notes: notes
+    }, (response) => {
+        // 处理 background.js 返回的结果
+        if (response?.status === 'success') {
+            showToast(i18n.get('notesSaved'));
+            closeTheNotesModal();
+            // 注意：UI的更新会由 background.js 修改存储后，通过 storage.onChanged 监听器自动触发，无需手动刷新
+        } else {
+            showToast(i18n.get("operationFailed"), 2000, "#ff4444");
+        }
+    });
+  }
+  /*
   function handleSaveNotes() {
     if (!currentEditingBookmarkId) return;
 
@@ -604,6 +633,7 @@ function initOptions(i18n, currentLang) {
       });
     }
   }
+    */
 
   // --- Helper Functions ---
   function createTreeItem(item, level, count) {
@@ -630,100 +660,116 @@ function initOptions(i18n, currentLang) {
   }
 
   // --- 更新：创建书签元素的函数 ---
+  /**
+ * Creates and returns the HTML element for a single bookmark item for the main options page.
+ * This function displays comprehensive details including AI analysis and all action buttons.
+ *
+ * @param {object} bookmark - The bookmark object containing all its data.
+ * @returns {HTMLElement} A div element representing the bookmark.
+ */
   function createBookmarkElement(bookmark) {
-    const div = document.createElement('div');
-    div.className = 'bookmark-item';
-    const faviconUrl = getFaviconUrl(bookmark.url);
-    const statusHTML = getStatusHTML(bookmark);
-    
-    const hasNotes = bookmark.notes && bookmark.notes.trim() !== '';
+      const div = document.createElement('div');
+      div.className = 'bookmark-item';
+      // --- KEY CHANGE ---
+      // The element's primary identifier is set to the stable `clientId`.
+      // All actions will now reference this ID.
+      div.dataset.id = bookmark.clientId;
 
-    // 学习助手SVG图标
-    const assistantIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px" fill="#6a1b9a"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></svg>`;
+      const faviconUrl = getFaviconUrl(bookmark.url); // Dependency
+      const statusHTML = getStatusHTML(bookmark);   // Dependency
+      
+      // Check if the bookmark has any notes to apply a special style to the button.
+      const hasNotes = bookmark.notes && bookmark.notes.trim() !== '';
 
-    div.innerHTML = `
-      <div class="bookmark-header">
-        <img class="favicon" src="${faviconUrl}" width="16" height="16" loading="lazy" alt="">
-        <div class="bookmark-title clickable" data-url="${bookmark.url}">${bookmark.title}</div>
-        <div class="action-buttons">
-          <button class="action-btn star ${bookmark.isStarred ? 'starred' : ''}" data-id="${bookmark.id}" title="${i18n.get('toggleStar')}">★</button>
-          <button class="action-btn assistant-btn" data-id="${bookmark.id}" title="${i18n.get('learningAssistant')}">${assistantIconSVG}</button>          
-          <button class="action-btn notes-btn ${hasNotes ? 'has-notes' : ''}" data-id="${bookmark.id}" title="${i18n.get('editNotes')}">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20">
-              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-              <path d="M0 0h24v24H0z" fill="none"/>
-            </svg>
-          </button>
-          <button class="action-btn regenerate-btn" data-id="${bookmark.id}" title="${i18n.get('regenerateAI')}">🔄</button>
-          <button class="action-btn delete-btn" data-id="${bookmark.id}" title="${i18n.get('delete')}">🗑</button>
+      // SVG icon for the "Learning Assistant" button.
+      const assistantIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px" fill="#6a1b9a"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></svg>`;
+
+      // The main HTML structure for the bookmark item.
+      div.innerHTML = `
+        <div class="bookmark-header">
+          <img class="favicon" src="${faviconUrl}" width="16" height="16" loading="lazy" alt="">
+          <div class="bookmark-title clickable" data-url="${bookmark.url}">${bookmark.title}</div>
+          <div class="action-buttons">
+            <button class="action-btn star ${bookmark.isStarred ? 'starred' : ''}" data-id="${bookmark.clientId}" title="${i18n.get('toggleStar')}">★</button>
+            <button class="action-btn assistant-btn" data-id="${bookmark.clientId}" title="${i18n.get('learningAssistant')}">${assistantIconSVG}</button>          
+            <button class="action-btn notes-btn ${hasNotes ? 'has-notes' : ''}" data-id="${bookmark.clientId}" title="${i18n.get('editNotes')}">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20">
+                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                <path d="M0 0h24v24H0z" fill="none"/>
+              </svg>
+            </button>
+            <button class="action-btn regenerate-btn" data-id="${bookmark.clientId}" title="${i18n.get('regenerateAI')}">🔄</button>
+            <button class="action-btn delete-btn" data-id="${bookmark.clientId}" title="${i18n.get('delete')}">🗑</button>
+          </div>
         </div>
-      </div>
-      
-      <div class="bookmark-url clickable" data-url="${bookmark.url}">${bookmark.url}</div>
-      
-      ${bookmark.aiStatus === 'completed' ? `
-        ${bookmark.category ? `<div class="bookmark-category">${bookmark.category}</div>` : ''}
-
-        ${bookmark.tags && bookmark.tags.length > 0 ? `
-          <div class="bookmark-tags">
-            ${bookmark.tags.map(tag => `<span class="tag" data-tag="${tag}">${tag}</span>`).join('')}
-          </div>
-        ` : `<div class="ai-status" style="font-size: 11px; color: #ff9800; margin: 5px 0;">${i18n.get('tagsMissing')}</div>`}
-
-        ${bookmark.summary ? `<div class="bookmark-summary">${bookmark.summary}</div>` : `<div class="ai-status" style="font-size: 11px; color: #ff9800; margin: 5px 0;">${i18n.get('summaryMissing')}</div>`}
         
-        ${bookmark.keyPoints && bookmark.keyPoints.length > 0 ? `
-          <div class="key-points">
-            <div class="key-points-title">${i18n.get('keyPoints')}:</div>
-            <ul class="key-points-list">
-              ${bookmark.keyPoints.map(point => `<li class="key-point">${point}</li>`).join('')}
-            </ul>
-          </div>
-        ` : ''}
+        <div class="bookmark-url clickable" data-url="${bookmark.url}">${bookmark.url}</div>
         
-        ${bookmark.contentType || bookmark.estimatedReadTime || bookmark.readingLevel ? `
-          <div class="bookmark-enhanced-info">
-            ${bookmark.contentType ? `
-              <div class="info-row">
-                <span class="info-label">${i18n.get('contentType')}:</span>
-                <span class="info-value">
-                  <span class="content-type-badge">${i18n.get('contentType_' + bookmark.contentType) || bookmark.contentType}</span>
-                </span>
-              </div>
-            ` : ''}
-            ${bookmark.estimatedReadTime ? `
-              <div class="info-row">
-                <span class="info-label">${i18n.get('readingTime')}:</span>
-                <span class="info-value">
-                  <span class="read-time">${bookmark.estimatedReadTime}${i18n.get('minutes')}</span>
-                </span>
-              </div>
-            ` : ''}
-            ${bookmark.readingLevel ? `
-              <div class="info-row">
-                <span class="info-label">${i18n.get('readingLevel')}:</span>
-                <span class="info-value">
-                  <span class="reading-level-badge ${bookmark.readingLevel}">${i18n.get('readingLevel_' + bookmark.readingLevel) || bookmark.readingLevel}</span>
-                </span>
-              </div>
-            ` : ''}
-          </div>
-        ` : ''}
-      ` : statusHTML}
+        ${bookmark.aiStatus === 'completed' ? `
+          ${bookmark.category ? `<div class="bookmark-category">${bookmark.category}</div>` : ''}
+
+          ${bookmark.tags && bookmark.tags.length > 0 ? `
+            <div class="bookmark-tags">
+              ${bookmark.tags.map(tag => `<span class="tag" data-tag="${tag}">${tag}</span>`).join('')}
+            </div>
+          ` : `<div class="ai-status" style="font-size: 11px; color: #ff9800; margin: 5px 0;">${i18n.get('tagsMissing')}</div>`}
+
+          ${bookmark.summary ? `<div class="bookmark-summary">${bookmark.summary}</div>` : `<div class="ai-status" style="font-size: 11px; color: #ff9800; margin: 5px 0;">${i18n.get('summaryMissing')}</div>`}
+          
+          ${bookmark.keyPoints && bookmark.keyPoints.length > 0 ? `
+            <div class="key-points">
+              <div class="key-points-title">${i18n.get('keyPoints')}:</div>
+              <ul class="key-points-list">
+                ${bookmark.keyPoints.map(point => `<li class="key-point">${point}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+          
+          ${bookmark.contentType || bookmark.estimatedReadTime || bookmark.readingLevel ? `
+            <div class="bookmark-enhanced-info">
+              ${bookmark.contentType ? `
+                <div class="info-row">
+                  <span class="info-label">${i18n.get('contentType')}:</span>
+                  <span class="info-value">
+                    <span class="content-type-badge">${i18n.get('contentType_' + bookmark.contentType) || bookmark.contentType}</span>
+                  </span>
+                </div>
+              ` : ''}
+              ${bookmark.estimatedReadTime ? `
+                <div class="info-row">
+                  <span class="info-label">${i18n.get('readingTime')}:</span>
+                  <span class="info-value">
+                    <span class="read-time">${bookmark.estimatedReadTime}${i18n.get('minutes')}</span>
+                  </span>
+                </div>
+              ` : ''}
+              ${bookmark.readingLevel ? `
+                <div class="info-row">
+                  <span class="info-label">${i18n.get('readingLevel')}:</span>
+                  <span class="info-value">
+                    <span class="reading-level-badge ${bookmark.readingLevel}">${i18n.get('readingLevel_' + bookmark.readingLevel) || bookmark.readingLevel}</span>
+                  </span>
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
+        ` : statusHTML}
+        
+        <div class="bookmark-date">${formatDate(bookmark.dateAdded)}</div>
+      `;
       
-      <div class="bookmark-date">${formatDate(bookmark.dateAdded)}</div>
-    `;
-    
-    const tagElements = div.querySelectorAll('.tag[data-tag]');
-    tagElements.forEach(tagEl => {
-      tagEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        searchByTag(tagEl.dataset.tag);
+      // Add event listeners to the tag elements to enable searching by tag.
+      const tagElements = div.querySelectorAll('.tag[data-tag]');
+      tagElements.forEach(tagEl => {
+        tagEl.addEventListener('click', (e) => {
+          e.stopPropagation(); // Prevent the click from bubbling up to the main item.
+          searchByTag(tagEl.dataset.tag); // Dependency
+        });
       });
-    });
-    
-    return div;
+      
+      return div;
   }
+
 
   function getBreadcrumb(folderId) {
       if (folderId === 'root') return i18n.get('allBookmarks');

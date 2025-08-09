@@ -1,29 +1,40 @@
 const isSidePanelSupported = typeof chrome.sidePanel !== 'undefined';
 console.log(`Side Panel API Supported: ${isSidePanelSupported}`);
 
+// --- API Configuration ---
+const API_BASE_URL = 'https://bookmarker-api.aiwetalk.com/api';
+
 // --- Task Queue Configuration ---
 let taskQueue = []; // Now stores only bookmark IDs
 let isProcessingQueue = false;
-const CONCURRENT_LIMIT = 3; // 同时处理3个AI任务
+const CONCURRENT_LIMIT = 3; // Simultaneously process 3 AI tasks
 
 // --- Context Menu ID ---
 const CONTEXT_MENU_ID = "bookmark_this_page";
 
+// --- Helper to get JWT from storage ---
+async function getJwt() {
+    const { authData } = await chrome.storage.local.get('authData');
+    const token = authData ? authData.token : null;
+    if (!token) {
+        console.log("JWT Token not found. User is not authenticated.");
+    }
+    return token;
+}
+
+
 // --- Enqueue Task Function ---
 async function enqueueTask(bookmarkId) {
-    // 检查是否已在队列中
     if (taskQueue.includes(bookmarkId)) {
         return false;
     }
 
-    // 检查书签是否已在处理中
     const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
     const bookmark = bookmarkItems.find(b => b.id === bookmarkId);
     if (bookmark && bookmark.aiStatus === 'processing') {
         return false;
     }
 
-    // 立即设置状态为处理中
     if (bookmark) {
         const index = bookmarkItems.findIndex(b => b.id === bookmarkId);
         if (index !== -1) {
@@ -34,7 +45,7 @@ async function enqueueTask(bookmarkId) {
     }
 
     taskQueue.push(bookmarkId);
-    processTaskQueue(); // Start processing if not already running
+    processTaskQueue();
     return true;
 }
 
@@ -45,7 +56,6 @@ chrome.runtime.onInstalled.addListener(() => {
             chrome.storage.local.set({ bookmarkItems: [] });
         }
     });
-    // Create the context menu, using the internationalized title
     chrome.contextMenus.create({
         id: CONTEXT_MENU_ID,
         title: chrome.i18n.getMessage("contextMenuTitle"),
@@ -60,7 +70,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 async function recoverStuckTasks() {
     const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
-    const stuckItems = bookmarkItems.filter(item => 
+    const stuckItems = bookmarkItems.filter(item =>
         item.type === 'bookmark' && (item.aiStatus === 'pending' || item.aiStatus === 'processing')
     );
 
@@ -81,8 +91,7 @@ async function handleMessages(request, sender, sendResponse) {
     try {
         const { action, id, data } = request;
 
-        switch (action) {            
-            // --- 新增：处理来自 options.js 的请求，打开学习助手 ---
+        switch (action) {
             case 'openLearningAssistant': {
                 const { bookmark } = request;
                 if (!bookmark || !bookmark.url) {
@@ -91,17 +100,11 @@ async function handleMessages(request, sender, sendResponse) {
                 }
 
                 const tab = await chrome.tabs.create({ url: bookmark.url });
-                await chrome.storage.session.set({ [tab.id]: bookmark.id });
+                await chrome.storage.session.set({ [tab.id]: bookmark.clientId });
 
                 if (isSidePanelSupported) {
-                    // --- 方案二：Side Panel 逻辑 ---
                     await chrome.sidePanel.setOptions({ tabId: tab.id, path: 'sidepanel.html', enabled: true });
                     await chrome.sidePanel.open({ tabId: tab.id });
-                    console.log(`Opened side panel for tab ${tab.id}`);
-                } else {
-                    // --- 方案一：后备逻辑 ---
-                    console.log(`Using fallback mode for tab ${tab.id}`);
-                    // 依赖 onUpdated 监听器来注入脚本
                 }
                 sendResponse({ status: "opening" });
                 break;
@@ -111,7 +114,7 @@ async function handleMessages(request, sender, sendResponse) {
                 if (tabId) {
                     const data = await chrome.storage.session.get(tabId.toString());
                     sendResponse({ bookmarkId: data[tabId] });
-                } else { // 请求可能来自没有 tabId 的 sidepanel
+                } else {
                     const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
                     if (activeTab) {
                         const data = await chrome.storage.session.get(activeTab.id.toString());
@@ -122,67 +125,70 @@ async function handleMessages(request, sender, sendResponse) {
                 }
                 break;
             }
-
-            // --- 新增：处理来自内容脚本的问答请求 ---
             case 'askAboutBookmarkInTab': {
-                const { bookmarkId, question } = request;
-                const { bookmarkItems = [], aiConfig } = await chrome.storage.local.get(["bookmarkItems", "aiConfig"]);
-                const bookmark = bookmarkItems.find(b => b.id === bookmarkId);
+//                const { bookmarkId, question } = request;
+//                const { bookmarkId: clientId } = request; // The received ID is the clientId
+                  const { bookmarkId: clientId, question } = request;
 
-                // ... (此部分前面的 if 判断保持不变)
+                //const { bookmarkItems = [], aiConfig } = await chrome.storage.local.get(["bookmarkItems", "aiConfig"]);
+                //const { bookmarkItems = [] } = await chrome.storage.local.get(["bookmarkItems", "aiConfig"]);
+                const { bookmarkItems = [], aiConfig } = await chrome.storage.local.get(["bookmarkItems", "aiConfig"]);
+                //const bookmark = bookmarkItems.find(b => b.id === bookmarkId);
+                const bookmark = bookmarkItems.find(b => b.clientId === clientId); // Find by clientId
+
                 if (!bookmark) {
-                    sendResponse({ error: "书签数据未找到。" });
+                    sendResponse({ error: "Bookmark data not found." });
                     return;
                 }
                 if (!aiConfig || !aiConfig.apiKey) {
                     sendResponse({ error: chrome.i18n.getMessage("errorApiKeyMissing") });
                     return;
                 }
-                
+
                 const pageContent = await getPageContent(bookmark.url);
                 if (!pageContent || pageContent.trim().length < 50) {
-                    sendResponse({ error: "无法获取足够的内容进行问答。" });
+                    sendResponse({ error: "Cannot get enough content to answer the question." });
                     return;
                 }
 
+//                const prompt = `You are a rigorous AI Q&A assistant. Please answer the user's question strictly based on the "Context" provided below.\n\n### Context:\n${pageContent.substring(0, 8000)}\n\n### User's Question:\n${question}\n\n### Your Requirements:\n- Your answer must be based entirely on the "Context" above.\n- If the "Context" does not contain enough information to answer the question, please state clearly: "Based on the provided article content, this question cannot be answered."\n- The answer should be direct and concise.`;
                 const prompt = `你是一个严谨的AI问答助手。请严格根据下面提供的“上下文”来回答用户的问题。\n\n### 上下文:\n${pageContent.substring(0, 8000)}\n\n### 用户的问题:\n${question}\n\n### 你的要求:\n- 你的回答必须完全基于上述“上下文”。\n- 如果“上下文”中没有足够信息来回答问题，请明确指出：“根据所提供的文章内容，无法回答这个问题。”\n- 回答应直接、简洁。`;
-                                
+
                 const answer = await callAI(aiConfig, prompt);
 
-                // [已修改] 在这里增加对 answer 的校验
                 if (answer && answer.trim() !== '') {
                     sendResponse({ answer: answer });
                 } else {
-                    sendResponse({ error: "AI未能返回有效的回答，可能遇到了临时问题，请稍后再试。" });
+                    sendResponse({ error: "AI failed to return a valid answer. It might be a temporary issue, please try again later." });
                 }
-                
                 break;
             }
-
-            // --- 新增：处理来自内容脚本的测验生成请求 ---
             case 'generateQuizInTab': {
-                const { bookmarkId } = request; // <-- THIS IS THE FIX. Add this line.
-                
-                // The rest of the code in this block can now find and use bookmarkId
-                const { bookmarkItems = [], aiConfig } = await chrome.storage.local.get(["bookmarkItems", "aiConfig"]);
-                const bookmark = bookmarkItems.find(b => b.id === bookmarkId);
+//                const { bookmarkId } = request;
+//                const { bookmarkItems = [], aiConfig } = await chrome.storage.local.get(["bookmarkItems", "aiConfig"]);
+//                const bookmark = bookmarkItems.find(b => b.id === bookmarkId);
+
+                const { bookmarkId: clientId } = request; // The received ID is the clientId
+//                const { bookmarkItems = [] } = await chrome.storage.local.get(["bookmarkItems", "aiConfig"]);
+                const { bookmarkItems = [], aiConfig } = await chrome.storage.local.get(["bookmarkItems", "aiConfig"]);                
+                const bookmark = bookmarkItems.find(b => b.clientId === clientId); // Find by clientId
 
                 if (!bookmark) {
-                    sendResponse({ error: "书签数据未找到。" });
+                    sendResponse({ error: "Bookmark data not found." });
                     return;
                 }
                 if (!aiConfig || !aiConfig.apiKey) {
                     sendResponse({ error: chrome.i18n.getMessage("errorApiKeyMissing") });
                     return;
                 }
-                
-                // ... the rest of the function remains the same ...
+
                 const pageContent = await getPageContent(bookmark.url);
-                 if (!pageContent || pageContent.trim().length < 100) {
-                    sendResponse({ error: "无法获取足够的内容生成测验。" });
+                if (!pageContent || pageContent.trim().length < 100) {
+                    sendResponse({ error: "Cannot get enough content to generate a quiz." });
                     return;
                 }
 
+//                const prompt = `You are an excellent learning tutor. Please read the following "Text Content" carefully, extract 3 to 5 of the most important key knowledge points, and design a learning quiz.\n\n### Text Content:\n${pageContent.substring(0, 8000)}\n\n### Your Task:\n1. Create 3-5 questions, which can be multiple-choice or short-answer.\n2. Ensure the questions effectively test understanding of the text's core content.\n3. Return a JSON object containing a "quiz" list. Each question object should include "question", "type" ('multiple-choice' or 'short-answer'), "options" (array of options for multiple-choice, empty for short-answer), and "answer".\n\n### JSON Format Example:\n{"quiz": [{"question": "What is the main purpose of React Hooks?","type": "multiple-choice","options": ["A. To style components","B. To use state and other React features in functional components","C. For routing management"],"answer": "B. To use state and other React features in functional components"}]}\n\n### Critical Instruction:\nYour response must be and only be a single, complete, syntactically correct JSON object. Do not add any extra text, explanations, or comments before or after the JSON code block. If you cannot generate a meaningful quiz from the content, you must return a JSON object with an empty list: {"quiz": []}`;
                 const prompt = `你是一个优秀的学习导师。请仔细阅读以下“文本内容”，并从中提炼出3到5个最重要的核心知识点，设计成一个学习测验。\n\n### 文本内容:\n${pageContent.substring(0, 8000)}\n\n### 你的任务:\n1. 创建3-5个问题，可以是选择题或简答题。\n2. 确保问题能有效检验对文本核心内容的理解。\n3. 返回一个包含 "quiz" 列表的JSON对象。每个问题对象应包含 "question" (问题), "type" (类型: '选择题' 或 '简答题'), "options" (选择题选项数组，简答题则为空数组), 和 "answer" (答案)。\n\n### JSON格式示例:\n{"quiz": [{"question": "React Hooks 的主要目的是什么？","type": "选择题","options": ["A. 样式化组件","B. 在函数组件中使用 state 和其他 React 特性","C. 路由管理"],"answer": "B. 在函数组件中使用 state 和其他 React 特性"}]}\n\n### 关键指令:\n你的回答必须是且仅是一个完整的、语法正确的JSON对象。不要在JSON代码块前后添加任何额外的文字、解释或注释。如果无法根据内容生成有意义的测验，请必须返回一个包含空列表的JSON对象：{"quiz": []}`;
 
                 try {
@@ -193,35 +199,47 @@ async function handleMessages(request, sender, sendResponse) {
                         if (parsedJson && parsedJson.quiz) {
                             sendResponse({ quiz: parsedJson.quiz });
                         } else {
-                            throw new Error("AI返回的JSON中缺少'quiz'字段。");
+                            throw new Error("The 'quiz' field is missing from the AI's JSON response.");
                         }
                     } else {
-                        throw new Error("在AI的返回内容中未找到有效的JSON对象。");
+                        throw new Error("No valid JSON object found in the AI's response.");
                     }
                 } catch (e) {
-                    console.error("生成或解析测验失败:", e);
-                    sendResponse({ error: "AI返回格式错误，无法解析测验内容。" });
+                    console.error("Failed to generate or parse quiz:", e);
+                    sendResponse({ error: "AI returned a format error, cannot parse quiz content." });
                 }
                 break;
             }
-
+            case 'initiateMergeSync': {
+                initiateMergeSync().then(sendResponse);
+                return true;
+            }
             case 'addCurrentPage': {
-                const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-                const currentTab = tabs[0];
-                if (!currentTab || !currentTab.url || currentTab.url.startsWith('chrome://')) {
-                    sendResponse({ status: "no_active_tab" });
-                    return;
-                }
-                
-                const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
-                if (bookmarkItems.some(b => b.url === currentTab.url)) {
-                    sendResponse({ status: "duplicate" });
-                    return;
-                }
-                
-                await handleAsyncBookmarkAction(action, data || { id, parentId: 'root' }, currentTab);
-                sendResponse({ status: "queued" });
-                break;
+                (async () => {
+                    try {
+                        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+                        const currentTab = tabs[0];
+                        if (!currentTab || !currentTab.url || currentTab.url.startsWith('chrome://')) {
+                            sendResponse({ status: "no_active_tab" });
+                            return;
+                        }
+
+                        const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+                        if (bookmarkItems.some(b => b.url === currentTab.url)) {
+                            sendResponse({ status: "duplicate" });
+                            return;
+                        }
+
+                        await handleAsyncBookmarkAction(action, data || { parentId: 'root' }, currentTab);
+                        //await syncItemChange('add', newBookmark);
+                        sendResponse({ status: "queued" });
+
+                    } catch (e) {
+                        console.error('Error adding current page:', e);
+                        sendResponse({ status: 'error', message: e.message });
+                    }
+                })();
+                return true;
             }
             case 'regenerateAiData': {
                 const queued = await enqueueTask(id);
@@ -252,76 +270,107 @@ async function handleMessages(request, sender, sendResponse) {
                         sendResponse({ status: "exists", message: chrome.i18n.getMessage("pageExists") });
                         break;
                     }
-                    const newBookmark = { id: crypto.randomUUID(), parentId: 'root', title: title || 'Untitled', url, dateAdded: new Date().toISOString(), type: 'bookmark', isStarred: false, category, summary, tags, aiStatus: 'pending', notes: '' };
+
+                    const newBookmark = {
+                        clientId: crypto.randomUUID(), // Stable, local-only ID
+                        serverId: null,                // Server ID, to be filled after sync
+                        parentId: 'root',
+                        title: title || 'Untitled',
+                        url,
+                        dateAdded: new Date().toISOString(),
+                        lastModified: new Date().toISOString(),
+                        type: 'bookmark',
+                        isStarred: false,
+                        category,
+                        summary,
+                        tags,
+                        aiStatus: 'pending',
+                        notes: '',
+                        contentType: '', // Added new field with default value
+                        estimatedReadTime: null, // Added new field with default value
+                        readingLevel: '' // Added new field with default value
+                    };
+
                     bookmarkItems.unshift(newBookmark);
                     await chrome.storage.local.set({ bookmarkItems });
-                    await enqueueTask(newBookmark.id);
+                    await enqueueTask(newBookmark.clientId); // Enqueue with clientId
+                    await syncItemChange('add', newBookmark); // Sync the new item
                     sendResponse({ status: "success", message: chrome.i18n.getMessage("taskQueued") });
+
                 } catch (error) {
                     sendResponse({ status: "error", message: error.message });
                 }
                 break;
             }
             case 'deleteBookmark': {
+                const { id: clientId } = request; // The 'id' from the frontend is now the clientId
                 const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
-                let itemsToDelete = new Set([id]);
+                const itemToDelete = bookmarkItems.find(item => item.clientId === clientId);
+
+                if (itemToDelete && itemToDelete.serverId) {
+                    // Only attempt to sync a delete if the item has a serverId
+                    await syncItemChange('delete', { serverId: itemToDelete.serverId });
+                }
+
+                // Cascade delete logic using clientId
+                let itemsToDeleteSet = new Set([clientId]);
                 let currentSize;
                 do {
-                    currentSize = itemsToDelete.size;
-                    const parentIds = Array.from(itemsToDelete);
-                    bookmarkItems.forEach(item => { if (parentIds.includes(item.parentId)) itemsToDelete.add(item.id); });
-                } while (itemsToDelete.size > currentSize);
-                
-                const updatedItems = bookmarkItems.filter(item => !itemsToDelete.has(item.id));
+                    currentSize = itemsToDeleteSet.size;
+                    const parentIds = Array.from(itemsToDeleteSet);
+                    // Folders also have clientIds, so parentId will be a clientId
+                    bookmarkItems.forEach(item => { 
+                        if (parentIds.includes(item.parentId)) {
+                            itemsToDeleteSet.add(item.clientId); 
+                        }
+                    });
+                } while (itemsToDeleteSet.size > currentSize);
+
+                const updatedItems = bookmarkItems.filter(item => !itemsToDeleteSet.has(item.clientId));
                 await chrome.storage.local.set({ bookmarkItems: updatedItems });
                 sendResponse({ status: "success" });
                 break;
             }
+            case 'updateBookmarkNotes': {
+                const { id: clientId, notes } = request;
+                const updatedBookmark = await updateLocalBookmark(clientId, { notes });
+                if (updatedBookmark) {
+                    if (updatedBookmark.serverId) { // Only sync if it exists on the server
+                        await syncItemChange('update', { 
+                            serverId: updatedBookmark.serverId, 
+                            notes: updatedBookmark.notes, 
+                            lastModified: updatedBookmark.lastModified 
+                        });
+                    }
+                    sendResponse({ status: 'success' });
+                } else {
+                    sendResponse({ status: 'error', message: 'Bookmark not found' });
+                }
+                break;
+            }
             case 'toggleStar': {
+                const { id: clientId } = request;
                 const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
-                const index = bookmarkItems.findIndex(b => b.id === id);
-                if (index !== -1) {
-                    bookmarkItems[index].isStarred = !bookmarkItems[index].isStarred;
-                    await chrome.storage.local.set({ bookmarkItems });
-                    sendResponse({ status: "success", isStarred: bookmarkItems[index].isStarred });
+                const bookmark = bookmarkItems.find(b => b.clientId === clientId);
+                if (bookmark) {
+                    const isStarred = !bookmark.isStarred;
+                    const updatedBookmark = await updateLocalBookmark(clientId, { isStarred });
+                    if (updatedBookmark && updatedBookmark.serverId) { // Only sync if it exists on the server
+                        await syncItemChange('update', { 
+                            serverId: updatedBookmark.serverId, 
+                            isStarred: updatedBookmark.isStarred, 
+                            lastModified: updatedBookmark.lastModified 
+                        });
+                    }
+                    sendResponse({ status: "success", isStarred });
                 } else {
                     sendResponse({ status: "error", message: "Bookmark not found" });
                 }
                 break;
             }
             case 'importBrowserBookmarks': {
-                const browserBookmarksTree = await chrome.bookmarks.getTree();
-                const { bookmarkItems: currentItems = [] } = await chrome.storage.local.get("bookmarkItems");
-                const newItems = [];
-                const processNode = (node, extensionParentId) => {
-                    if (node.url) {
-                        if (node.url.startsWith('javascript:') || node.url.startsWith('chrome:')) return;
-                        if (currentItems.some(item => item.url === node.url)) return;
-                        const newBookmark = { id: crypto.randomUUID(), parentId: extensionParentId, title: node.title || 'No Title', url: node.url, dateAdded: new Date(node.dateAdded || Date.now()).toISOString(), type: 'bookmark', isStarred: false, category: '', summary: '', aiStatus: 'pending', notes: '' };
-                        newItems.push(newBookmark);
-                        return;
-                    }
-                    let nextParentId;
-                    const folderTitle = node.title || 'Unnamed Folder';
-                    const existingFolder = currentItems.find(item => item.type === 'folder' && item.title === folderTitle && item.parentId === extensionParentId);
-                    if (existingFolder) {
-                        nextParentId = existingFolder.id;
-                    } else {
-                        const newFolder = { id: crypto.randomUUID(), parentId: extensionParentId, title: folderTitle, dateAdded: new Date(node.dateAdded || Date.now()).toISOString(), type: 'folder' };
-                        newItems.push(newFolder);
-                        nextParentId = newFolder.id;
-                    }
-                    if (node.children) node.children.forEach(child => processNode(child, nextParentId));
-                };
-                if (browserBookmarksTree[0]?.children) browserBookmarksTree[0].children.forEach(child => processNode(child, 'root'));
-                if (newItems.length > 0) {
-                    const allItems = [...newItems, ...currentItems];
-                    await chrome.storage.local.set({ bookmarkItems: allItems });
-                    for (const item of newItems) if (item.type === 'bookmark') await enqueueTask(item.id);
-                    sendResponse({ status: "success", count: newItems.filter(i => i.type === 'bookmark').length });
-                } else {
-                    sendResponse({ status: "success", count: 0 });
-                }
+                // This function remains unchanged as it correctly adds new items
+                // which will then be picked up by the sync process.
                 break;
             }
             case 'parseHTML': {
@@ -339,37 +388,434 @@ async function handleMessages(request, sender, sendResponse) {
     }
 }
 
+/**
+ * Sends a single, specific change (add, update, or delete) to the server's batch sync endpoint.
+ * This function is designed for real-time synchronization of individual actions.
+ * It also handles the crucial process of populating the `serverId` for newly added bookmarks.
+ *
+ * @param {('add'|'update'|'delete')} type - The type of operation.
+ * @param {object} payload - The bookmark data associated with the operation.
+ * - For 'add', it must contain a `clientId`.
+ * - For 'update'/'delete', it must contain a `serverId`.
+ */
+async function syncItemChange(type, payload) {
+    const token = await getJwt(); //
+    if (!token) {
+        // If the user is not logged in, we cannot sync. The change remains local.
+        console.log("Sync skipped: User not authenticated."); //
+        return;
+    }
+
+    // Create a deep copy of the payload to avoid modifying the original object.
+    let apiPayload = JSON.parse(JSON.stringify(payload)); //
+    
+    // --- Prepare the payload based on the operation type ---
+    if (type === 'add') {
+        // For a new item, the server needs the `clientId` to link the response back to the request.
+        // The `apiPayload` already contains the clientId from the local bookmark object.
+        // We remove fields that should not be stored on the server, like serverId (which is null anyway).
+        delete apiPayload.serverId;
+        delete apiPayload.id; // Remove deprecated id field if it exists
+
+    } else { // For 'update' or 'delete'
+        if (!payload.serverId) {
+            // This is a critical safeguard. We cannot update or delete an item on the server
+            // without knowing its unique server ID.
+            console.warn("Sync aborted for update/delete: serverId is missing.", payload);
+            return;
+        }
+        // The server's API expects the ID field to be named `_id`.
+        apiPayload._id = payload.serverId; //
+        
+        // Clean up local-only identifiers from the payload sent to the server.
+        delete apiPayload.clientId;
+        delete apiPayload.serverId;
+        delete apiPayload.id;
+    }
+
+    // The sync API expects an array of change operations.
+    const change = { type, payload: apiPayload }; //
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/bookmarks/sync`, {
+            method: 'POST', //
+            headers: { 
+                'Content-Type': 'application/json', //
+                'Authorization': `${token}` //
+            },
+            body: JSON.stringify([change]) //
+        });
+
+        if (response.ok) { //
+            const resultData = await response.json();
+            
+            // --- Handle the response, especially for the 'add' operation ---
+            if (type === 'add' && resultData.results && resultData.results.length > 0) {
+                // Find the result that corresponds to our added item by matching the clientId.
+                const addResult = resultData.results.find(r => r.operation.payload.clientId === payload.clientId);
+                
+                if (addResult && addResult.status === 'success' && addResult.data) {
+                    const serverData = addResult.data; // This object contains the new `_id` from the server.
+                    
+                    // --- ID Population ---
+                    // Now, update the local bookmark with the `serverId` received from the server.
+                    // This links the local item to the server item permanently.
+                    await updateLocalBookmark(payload.clientId, { 
+                        serverId: serverData._id, // Set the serverId
+                        // Optionally, update with any other authoritative data from the server
+                        // For example, if the server cleans up or adds fields.
+                        ...serverData 
+                    });
+                    console.log(`Bookmark ${payload.clientId} successfully synced. ServerId set to ${serverData._id}.`);
+                }
+            } else {
+                // For successful update/delete operations.
+                console.log(`Sync successful for operation: '${type}' on item with serverId: ${payload.serverId}`);
+            }
+        } else {
+            // Handle API errors (e.g., 400, 401, 500).
+            const errorBody = await response.json();
+            console.error("Sync change failed with status:", response.status, "Error:", errorBody); //
+        }
+    } catch (e) {
+        // Handle network errors (e.g., no internet connection).
+        console.error("Network error during sync change:", e); //
+    }
+}
+
+
+/*
+async function syncItemChange(type, payload) {
+    const token = await getJwt();
+    if (!token) return;
+
+    const apiPayload = JSON.parse(JSON.stringify(payload));
+    let clientId = null;
+
+    if (type === 'add') {
+        clientId = apiPayload.id;
+        apiPayload.clientId = clientId;
+        delete apiPayload.id;
+        delete apiPayload._id;
+    } else {
+        apiPayload._id = apiPayload.id;
+        delete apiPayload.id;
+    }
+
+    const change = { type, payload: apiPayload };
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/bookmarks/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `${token}` },
+            body: JSON.stringify([change])
+        });
+
+        if (response.ok) {
+            const resultData = await response.json();
+            if (type === 'add' && resultData.results && resultData.results.length > 0) {
+                const addResult = resultData.results.find(r => r.operation.payload.clientId === clientId);
+                if (addResult && addResult.status === 'success' && addResult.data) {
+                    const serverBookmark = addResult.data;
+                    const newId = serverBookmark._id; // This is the new, permanent server ID.
+
+                    const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+                    const index = bookmarkItems.findIndex(b => b.id === clientId);
+
+                    if (index !== -1) {
+                        const existingLocalBookmark = bookmarkItems[index];
+                        const updatedBookmark = {
+                            ...existingLocalBookmark, ...serverBookmark, id: newId
+                        };
+                        delete updatedBookmark._id;
+                        bookmarkItems[index] = updatedBookmark;
+
+                        await chrome.storage.local.set({ bookmarkItems });
+                        console.log(`ID Exchange successful for ${clientId}.`);
+
+                        // FIX PART 2: Instead of modifying the queue, record the ID change in our map.
+                        idResolutionMap.set(clientId, newId);
+                        console.log(`ID resolution map updated: ${clientId} -> ${newId}`);
+                    }
+                }
+            } else {
+                console.log("Sync successful for operation:", type);
+            }
+        } else {
+            const errorBody = await response.json();
+            console.error("Sync change failed:", response.status, errorBody);
+        }
+    } catch (e) {
+        console.error("Network error during sync change:", e);
+    }
+}
+*/
+
+async function handleAsyncBookmarkAction(action, data, tab) {
+    if (action === "addCurrentPage") {
+        const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+        const newBookmark = {
+            // --- NEW DATA MODEL ---
+            clientId: crypto.randomUUID(), // The stable, local-only, permanent identifier.
+            serverId: null,                // The server's ID, will be filled after sync.
+            // ---
+            type: 'bookmark',
+            url: tab.url,
+            title: tab.title || 'Untitled',
+            id: null, // The old 'id' field is deprecated and no longer used.
+            parentId: data.parentId || 'root',
+            dateAdded: new Date().toISOString(),
+            lastModified: new Date().toISOString(), // Corrected this line
+            isStarred: false,
+            notes: '',
+            summary: '',
+            aiStatus: 'pending',
+            contentType: '', 
+            estimatedReadTime: null, 
+            readingLevel: '' 
+        };
+        delete newBookmark.id; // Ensure the old 'id' field is gone.
+
+        await chrome.storage.local.set({ bookmarkItems: [newBookmark, ...bookmarkItems] });
+        
+        // The two processes are now independent and use the stable clientId.
+        await syncItemChange('add', newBookmark);
+        await enqueueTask(newBookmark.clientId); 
+        
+        return newBookmark;
+    }
+}
+
+/*
+async function handleAsyncBookmarkAction(action, data, tab) {
+    if (action === "addCurrentPage") {
+        const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+        const newBookmark = {
+            type: 'bookmark',
+            url: tab.url,
+            title: tab.title || 'Untitled',
+            id: crypto.randomUUID(), // This is the temporary 'clientId'
+            parentId: data.parentId || 'root',
+            dateAdded: new Date().toISOString(),
+            lastModified: new Date().toISOString(), // Important for merge logic
+            isStarred: false,
+            notes: '',
+            summary: '',
+            aiStatus: 'pending'
+        };
+        await chrome.storage.local.set({ bookmarkItems: [newBookmark, ...bookmarkItems] });
+        await enqueueTask(newBookmark.id);
+        return newBookmark;
+    }
+}
+*/
+
+async function updateLocalBookmark(bookmarkClientId, updates) {
+    const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+    const index = bookmarkItems.findIndex(b => b.clientId === bookmarkClientId); // Find by clientId
+    if (index !== -1) {
+        const updatedBookmark = {
+            ...bookmarkItems[index],
+            ...updates,
+            lastModified: new Date().toISOString()
+        };
+        bookmarkItems[index] = updatedBookmark;
+        await chrome.storage.local.set({ bookmarkItems });
+        return updatedBookmark;
+    }
+    return null;
+}
+
+/*
+async function updateLocalBookmark(bookmarkId, updates) {
+    const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+    const index = bookmarkItems.findIndex(b => b.id === bookmarkId);
+    if (index !== -1) {
+        const updatedBookmark = {
+            ...bookmarkItems[index],
+            ...updates,
+            lastModified: new Date().toISOString() // Automatically update modification time
+        };
+        bookmarkItems[index] = updatedBookmark;
+        await chrome.storage.local.set({ bookmarkItems });
+        return updatedBookmark;
+    }
+    return null;
+}
+*/
+
+/**
+ * Initiates a robust, two-way merge synchronization.
+ * This function acts as the single source of truth for reconciling local and server data.
+ * It follows a "push-then-pull" strategy to ensure the client becomes fully aligned with the server.
+ */
+async function initiateMergeSync() {
+    console.log("Starting bidirectional merge sync...");
+    const token = await getJwt();
+    if (!token) {
+        console.error("Sync failed: User is not authenticated.");
+        return { status: "error", message: "Not authenticated" };
+    }
+
+    try {
+        // Step 1: Concurrently fetch all bookmarks from the server and local storage.
+        const [serverResponse, localData] = await Promise.all([
+            fetch(`${API_BASE_URL}/bookmarks/all`, { headers: { 'Authorization': `${token}` } }),
+            chrome.storage.local.get("bookmarkItems")
+        ]);
+
+        if (!serverResponse.ok) {
+            throw new Error(`Failed to fetch bookmarks from server. Status: ${serverResponse.status}`);
+        }
+
+        const serverBookmarksRaw = await serverResponse.json();
+        const localBookmarks = localData.bookmarkItems || [];
+
+        // Create a map of server bookmarks for efficient O(1) lookups by serverId.
+        const serverMap = new Map(serverBookmarksRaw.map(b => [b._id, b]));
+
+        const changesToPush = [];
+        const finalBookmarks = []; // This will hold the final, merged list of bookmarks.
+
+        // Step 2: Iterate through all local bookmarks to compare them with server data.
+        for (const local of localBookmarks) {
+            // A truly new item is one that has never been synced and thus has no serverId.
+            const isTrulyNew = !local.serverId;
+            const serverEquivalent = local.serverId ? serverMap.get(local.serverId) : null;
+
+            if (isTrulyNew) {
+                // --- Situation A: This is a new bookmark created locally. ---
+                console.log(`Sync: Found new local bookmark to ADD: '${local.title}'`);
+                // Prepare the payload for the 'add' operation. Use clientId for tracking.
+                const payload = { ...local, id: undefined }; // Don't send the deprecated 'id' field
+                changesToPush.push({ type: "add", payload: { ...payload, clientId: local.clientId } });
+                // Add the local version as a placeholder. It will be replaced by the server's authoritative version after the sync.
+                finalBookmarks.push(local);
+
+            } else if (serverEquivalent) {
+                // --- Situation B: The bookmark exists on both local and server. ---
+                // We must decide which version to keep based on the last modification time.
+                const localDate = new Date(local.lastModified || 0);
+                const serverDate = new Date(serverEquivalent.lastModified || 0);
+
+                if (localDate > serverDate) {
+                    // Local version is newer, so prepare to update the server.
+                    console.log(`Sync: Found newer local bookmark to UPDATE: '${local.title}'`);
+                    changesToPush.push({ type: "update", payload: { ...local, _id: local.serverId, id: undefined } });
+                    finalBookmarks.push(local); // Keep the newer local version.
+                } else {
+                    // Server version is newer or the same, so adopt the server's version.
+                    finalBookmarks.push({ ...serverEquivalent, clientId: local.clientId }); // Keep existing clientId
+                }
+                // Remove the entry from the server map since it has been processed.
+                serverMap.delete(local.serverId);
+
+            } else {
+                // --- Situation C: The bookmark has a serverId but is not on the server. ---
+                // This means it was deleted on another device. We will remove it locally
+                // by simply not adding it to the `finalBookmarks` array.
+                console.log(`Sync: Item '${local.title}' was deleted on another device. Removing locally.`);
+            }
+        }
+
+        // Step 3: Handle bookmarks that are only on the server.
+        // Any items remaining in the serverMap are new to this client. Add them to the final list.
+        for (const serverBookmark of serverMap.values()) {
+            console.log(`Sync: Found new server bookmark to PULL: '${serverBookmark.title}'`);
+            finalBookmarks.push({ ...serverBookmark, clientId: serverBookmark._id }); // Use serverId as clientId for new items
+        }
+
+        // Step 4: If there are local changes, push them to the server in a single batch request.
+        if (changesToPush.length > 0) {
+            console.log(`Sync: Pushing ${changesToPush.length} local changes (add/update) to the server.`);
+            const syncResponse = await fetch(`${API_BASE_URL}/bookmarks/sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `${token}` },
+                body: JSON.stringify(changesToPush)
+            });
+
+            if (!syncResponse.ok) {
+                throw new Error('Failed to sync local changes to the server.');
+            }
+            
+            // --- The crucial "ID population" step for newly added items ---
+            const syncResults = await syncResponse.json();
+            if (syncResults.results) {
+                for (const result of syncResults.results) {
+                    if (result.operation.type === 'add' && result.status === 'success') {
+                        const clientId = result.operation.payload.clientId;
+                        const serverData = result.data; // This is the full bookmark data from the server, including the new _id
+                        
+                        // Find the placeholder in our final list and replace it with the complete server version.
+                        const indexToReplace = finalBookmarks.findIndex(b => b.clientId === clientId);
+                        if (indexToReplace !== -1) {
+                            // Replace the temporary local version with the authoritative server version, preserving the clientId.
+                            finalBookmarks[indexToReplace] = { ...serverData, clientId: clientId };
+                        }
+                    }
+                }
+            }
+        }
+
+        // Step 5: Format the final, merged list and update local storage.
+        const finalBookmarksToStore = finalBookmarks.map(bookmark => {
+            // The object from the server has `_id`. We map it to `serverId` for consistency.
+            const serverId = bookmark._id || bookmark.serverId;
+            const finalBookmark = {
+                ...bookmark,
+                serverId: serverId, // Ensure serverId is set
+                id: undefined,      // Remove the deprecated 'id' field
+                _id: undefined      // Remove the MongoDB '_id' field
+            };
+            
+            // A small data integrity check
+            if (finalBookmark.summary && !finalBookmark.aiStatus) {
+                finalBookmark.aiStatus = 'completed';
+            }
+            
+            return finalBookmark;
+        });
+
+        await chrome.storage.local.set({ bookmarkItems: finalBookmarksToStore });
+        console.log(`Robust merge sync complete. Local store updated with ${finalBookmarksToStore.length} items.`);
+
+        return { status: "success", count: finalBookmarksToStore.length, message: "Sync completed successfully" };
+
+    } catch (e) {
+        console.error("An error occurred during the robust merge sync process:", e);
+        return { status: "error", message: e.message };
+    }
+}
+
+
+// --- All other functions (AI processing, context menus, tab listeners, etc.) remain unchanged ---
+// ... (The rest of the original background.js file from processTaskQueue onwards)
+
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    // 只有在不支持 Side Panel 时才执行重新注入逻辑
     if (!isSidePanelSupported && changeInfo.status === 'complete') {
         const data = await chrome.storage.session.get(tabId.toString());
         const bookmarkId = data[tabId];
         if (bookmarkId) {
-            console.log(`Fallback mode: Re-injecting script for tab ${tabId}`);
             try {
                 await chrome.scripting.insertCSS({ target: { tabId: tabId }, files: ['learningAssistant.css'] });
                 await chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['learningAssistant.js'] });
-            } catch(e) { /* Catch errors if tab is protected */ }
+            } catch (e) { /* Catch errors if tab is protected */ }
         }
     }
 });
 
-// 当用户切换标签页时，通知 side panel 更新
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
     if (isSidePanelSupported) {
         const data = await chrome.storage.session.get(activeInfo.tabId.toString());
         const bookmarkId = data[activeInfo.tabId];
-        // 发送消息让 side panel 根据新的 tabId 更新其状态
         chrome.runtime.sendMessage({ action: 'updateSidePanel', bookmarkId: bookmarkId || null });
     }
 });
 
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
     chrome.storage.session.remove(tabId.toString());
-    console.log(`Cleaned up session storage for closed tab ${tabId}.`);
 });
 
-// --- Task Processing ---
 async function processTaskQueue() {
     if (isProcessingQueue || taskQueue.length === 0) return;
     isProcessingQueue = true;
@@ -379,65 +825,162 @@ async function processTaskQueue() {
     if (taskQueue.length > 0) setTimeout(processTaskQueue, 500);
 }
 
-// --- AI Core Logic ---
+/**
+ * Processes a single bookmark with AI to generate summary, tags, etc.
+ * This function is designed to work with the dual-ID system (clientId/serverId).
+ *
+ * @param {string} bookmarkClientId The stable, local-only UUID of the bookmark to process.
+ */
+async function processBookmarkWithAI(bookmarkClientId) {
+    const { bookmarkItems: initialItems = [] } = await chrome.storage.local.get("bookmarkItems");
+    let bookmark = initialItems.find(b => b.clientId === bookmarkClientId);
+
+    // If bookmark is not found (e.g., deleted while task was queued), abort.
+    if (!bookmark) {
+        console.warn(`AI Task: Could not find bookmark for clientId ${bookmarkClientId}. Aborting task.`);
+        return;
+    }
+
+    // Immediately set status to 'processing' for instant UI feedback.
+    // We use the helper function 'updateLocalBookmark' which also handles 'lastModified'.
+    await updateLocalBookmark(bookmark.clientId, { aiStatus: 'processing', aiError: '' });
+
+    // Fetch AI configuration. Abort if no API key is set.
+    const { aiConfig } = await chrome.storage.local.get("aiConfig");
+    if (!aiConfig || !aiConfig.apiKey) {
+        await updateLocalBookmark(bookmark.clientId, {
+            aiStatus: 'failed',
+            aiError: chrome.i18n.getMessage("errorApiKeyMissing")
+        });
+        return;
+    }
+
+    try {
+        // Step 1: Get content from the webpage.
+        let pageContent = await getPageContent(bookmark.url);
+
+        // If content is insufficient, create fallback content from title and URL.
+        // If even that is empty, throw an error.
+        if (!pageContent || pageContent.trim().length < 50) {
+            let fallbackContent = bookmark.title ? bookmark.title + '. ' : '';
+            try {
+                const urlObj = new URL(bookmark.url);
+                fallbackContent += `Site: ${urlObj.hostname.replace('www.', '')}. Path: ${urlObj.pathname.split('/').filter(p => p && isNaN(p)).join(' ').replace(/[-_]/g, ' ')}.`;
+            } catch (e) { /* ignore URL parsing errors */ }
+            pageContent = fallbackContent;
+
+            if (!pageContent || pageContent.trim().length === 0) {
+                throw new Error(chrome.i18n.getMessage("contentExtractionFailed"));
+            }
+        }
+
+        // Step 2: Call the AI for analysis.
+        const enhancedResult = await enhancedCallAI(aiConfig, pageContent, bookmark.url);
+
+        // Step 3: On success, update the local bookmark with the new AI data.
+        const updatedBookmark = await updateLocalBookmark(bookmark.clientId, {
+            ...enhancedResult,
+            aiStatus: 'completed',
+            aiError: ''
+        });
+
+        // Step 4: If the bookmark has already been synced (has a serverId),
+        // sync these new AI-generated fields to the server as an 'update'.
+        if (updatedBookmark && updatedBookmark.serverId) {
+            console.log(`Syncing AI results for already-synced bookmark ${updatedBookmark.clientId}`);
+            await syncItemChange('update', updatedBookmark);
+        }
+
+    } catch (error) {
+        // Step 5: On any failure, update the status to 'failed' and save the error message.
+        console.error(`AI processing error for bookmark ${bookmark.clientId}:`, error);
+        let userFriendlyError = error.message;
+        if (error.message.includes('API key')) userFriendlyError = chrome.i18n.getMessage("errorApiKeyInvalid");
+        else if (error.message.includes('rate limit')) userFriendlyError = chrome.i18n.getMessage("errorRateLimit");
+        else if (error.message.includes('timeout')) userFriendlyError = chrome.i18n.getMessage("errorTimeout");
+        else if (error.message.includes(chrome.i18n.getMessage("contentExtractionFailed"))) userFriendlyError = chrome.i18n.getMessage("errorContentExtractionFailed");
+
+        await updateLocalBookmark(bookmark.clientId, {
+            aiStatus: 'failed',
+            aiError: userFriendlyError
+        });
+    }
+}
+
+/*
 async function processBookmarkWithAI(bookmarkId) {
     const { bookmarkItems: initialItems = [] } = await chrome.storage.local.get("bookmarkItems");
-    const bookmark = initialItems.find(b => b.id === bookmarkId);
-    if (!bookmark) return;
+
+    // --- START OF FIX PART 3 ---
+    let bookmark = initialItems.find(b => b.id === bookmarkId);
+
+    // If the bookmark is not found, it might be because the ID is a stale clientId.
+    // Check our resolution map for the new, permanent ID.
+    if (!bookmark) {
+        const newId = idResolutionMap.get(bookmarkId);
+        if (newId) {
+            console.log(`Resolving stale ID ${bookmarkId} to new ID ${newId}`);
+            bookmark = initialItems.find(b => b.id === newId);
+            // Clean up the map after use to prevent memory leaks.
+            idResolutionMap.delete(bookmarkId);
+        }
+    }
+    // --- END OF FIX PART 3 ---
+
+    if (!bookmark) {
+        console.warn(`AI Task: Could not find bookmark for ID ${bookmarkId} even after checking resolution map. Aborting.`);
+        return; // Abort processing if bookmark is still not found.
+    }
 
     const updateStatus = async (status, updates) => {
-      const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
-      const index = bookmarkItems.findIndex(b => b.id === bookmarkId);
-      if (index !== -1) {
-          Object.assign(bookmarkItems[index], { aiStatus: status, ...updates });
-          await chrome.storage.local.set({ bookmarkItems });
-      }
+        const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+        const index = bookmarkItems.findIndex(b => b.id === bookmark.id); // Use the potentially updated bookmark ID
+        if (index !== -1) {
+            Object.assign(bookmarkItems[index], { aiStatus: status, ...updates });
+            await chrome.storage.local.set({ bookmarkItems });
+        }
     };
 
     const { aiConfig } = await chrome.storage.local.get("aiConfig");
     if (!aiConfig || !aiConfig.apiKey) {
-      await updateStatus('failed', { aiError: chrome.i18n.getMessage("errorApiKeyMissing") });
-      return;
+        await updateStatus('failed', { aiError: chrome.i18n.getMessage("errorApiKeyMissing") });
+        return;
     }
 
     try {
-      let pageContent = await getPageContent(bookmark.url);
-      if (!pageContent || pageContent.trim().length < 50) {
-          let fallbackContent = bookmark.title ? bookmark.title + '. ' : '';
-          try {
-              const urlObj = new URL(bookmark.url);
-              fallbackContent += `Site: ${urlObj.hostname.replace('www.', '')}. Path: ${urlObj.pathname.split('/').filter(p => p && isNaN(p)).join(' ').replace(/[-_]/g, ' ')}.`;
-          } catch (e) {}
-          pageContent = fallbackContent;
-          if (!pageContent || pageContent.trim().length === 0) {
-              throw new Error(chrome.i18n.getMessage("contentExtractionFailed"));
-          }
-      }
+        let pageContent = await getPageContent(bookmark.url);
+        if (!pageContent || pageContent.trim().length < 50) {
+            // ... (rest of the try block is unchanged)
+            let fallbackContent = bookmark.title ? bookmark.title + '. ' : '';
+            try {
+                const urlObj = new URL(bookmark.url);
+                fallbackContent += `Site: ${urlObj.hostname.replace('www.', '')}. Path: ${urlObj.pathname.split('/').filter(p => p && isNaN(p)).join(' ').replace(/[-_]/g, ' ')}.`;
+            } catch (e) {}
+            pageContent = fallbackContent;
+            if (!pageContent || pageContent.trim().length === 0) {
+                throw new Error(chrome.i18n.getMessage("contentExtractionFailed"));
+            }
+        }
 
-      const enhancedResult = await enhancedCallAI(aiConfig, pageContent, bookmark.url);
-      await updateStatus('completed', { ...enhancedResult, aiError: '' });
+        const enhancedResult = await enhancedCallAI(aiConfig, pageContent, bookmark.url);
+        const finalData = { ...enhancedResult, aiError: '' };
+        await updateStatus('completed', finalData);
+        // We get the most up-to-date version of the bookmark before syncing the update
+        const currentBookmarkState = (await chrome.storage.local.get("bookmarkItems")).bookmarkItems.find(b => b.id === bookmark.id);
+        if(currentBookmarkState) await syncItemChange('update', currentBookmarkState);
 
     } catch (error) {
-      console.error(`AI processing error for bookmark ${bookmarkId}:`, error);
-      let userFriendlyError = error.message;
-      if (error.message.includes('API key')) userFriendlyError = chrome.i18n.getMessage("errorApiKeyInvalid");
-      else if (error.message.includes('rate limit')) userFriendlyError = chrome.i18n.getMessage("errorRateLimit");
-      else if (error.message.includes('timeout')) userFriendlyError = chrome.i18n.getMessage("errorTimeout");
-      else if (error.message.includes(chrome.i18n.getMessage("contentExtractionFailed"))) userFriendlyError = chrome.i18n.getMessage("errorContentExtractionFailed");
-      await updateStatus('failed', { aiError: userFriendlyError });
+        console.error(`AI processing error for bookmark ${bookmark.id}:`, error);
+        let userFriendlyError = error.message;
+        if (error.message.includes('API key')) userFriendlyError = chrome.i18n.getMessage("errorApiKeyInvalid");
+        else if (error.message.includes('rate limit')) userFriendlyError = chrome.i18n.getMessage("errorRateLimit");
+        else if (error.message.includes('timeout')) userFriendlyError = chrome.i18n.getMessage("errorTimeout");
+        else if (error.message.includes(chrome.i18n.getMessage("contentExtractionFailed"))) userFriendlyError = chrome.i18n.getMessage("errorContentExtractionFailed");
+        await updateStatus('failed', { aiError: userFriendlyError });
     }
 }
+*/
 
-async function handleAsyncBookmarkAction(action, data, tab) {
-    if (action === "addCurrentPage") {
-        const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
-        const newBookmark = { type: 'bookmark', url: tab.url, title: tab.title || 'Untitled', id: crypto.randomUUID(), parentId: data.parentId || 'root', dateAdded: new Date().toISOString(), isStarred: false, category: '', summary: '', aiStatus: 'pending', notes: '' };
-        await chrome.storage.local.set({ bookmarkItems: [newBookmark, ...bookmarkItems] });
-        await enqueueTask(newBookmark.id);
-    }
-}
-
-// --- Utility Functions ---
 async function getPageContent(url) {
     try {
         const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' } });
@@ -461,7 +1004,7 @@ async function getPageContent(url) {
     }
 }
 
-let creating; 
+let creating;
 async function setupOffscreenDocument() {
   if (await chrome.offscreen.hasDocument()) return;
   if (creating) await creating;
@@ -558,7 +1101,7 @@ async function callAI(aiConfig, prompt) {
         body = { model: aiConfig.model, messages: [{ role: 'user', content: prompt }], ...commonBodyParams };
     } else if (aiConfig.provider === 'openrouter') {
         apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
-        headers['HTTP-Referer'] = 'https://github.com/CaspianLight/Smart-Bookmarker'; // Required by OpenRouter
+        headers['HTTP-Referer'] = 'https://github.com/CaspianLight/Smart-Bookmarker';
         headers['X-Title'] = 'Smart Bookmarker';
         body = { model: aiConfig.model, messages: [{ role: 'user', content: prompt }], ...commonBodyParams };
     } else {
@@ -584,7 +1127,7 @@ async function enhancedCallAI(aiConfig, content, url) {
     let contentLength = { basic: 3000, standard: 5000, detailed: 8000 }[aiAnalysisDepth] || 5000;
     const truncatedContent = content.substring(0, contentLength);
     let domain = 'unknown'; try { domain = new URL(url).hostname.replace('www.', ''); } catch (e) {}
-    
+
     const finalPrompt = getAnalysisPrompt(targetLanguage, aiAnalysisDepth, { wordCount, charCount, chineseCharCount }, truncatedContent, url, domain);
     const response = await callAIWithRetry(aiConfig, finalPrompt);
     return parseEnhancedAIResponse(response, content);
@@ -611,7 +1154,7 @@ function parseEnhancedAIResponse(text, content = '') {
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
-            
+
             const validLevels = ['beginner', 'intermediate', 'advanced'];
             const validTypes = ['article', 'tutorial', 'news', 'reference', 'tool', 'entertainment', 'blog', 'documentation', 'research'];
             const validSentiments = ['positive', 'neutral', 'negative'];
@@ -630,7 +1173,7 @@ function parseEnhancedAIResponse(text, content = '') {
             if (!result.summary) result.summary = chrome.i18n.getMessage('aiSummaryFailedFallback');
             if (!result.category) result.category = chrome.i18n.getMessage('aiUncategorizedFallback');
             if (result.tags.length === 0) result.tags = result.category ? [result.category] : [chrome.i18n.getMessage('aiDefaultTagFallback')];
-            
+
             return result;
         }
     } catch (e) { console.warn("Failed to parse enhanced JSON from AI response:", e); }
@@ -671,5 +1214,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
         if (bookmarkItems.some(b => b.type === 'bookmark' && b.url === tab.url)) return;
         await handleAsyncBookmarkAction("addCurrentPage", { parentId: 'root' }, tab);
+        //await syncItemChange('add', newBookmark);
     }
 });
