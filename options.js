@@ -110,6 +110,7 @@ function initOptions(i18n, currentLang) {
   const folderTreeContainer = document.getElementById('folder-tree-container');
   const bookmarkListContainer = document.getElementById('bookmark-list-container');
   const aiProvider = document.getElementById('aiProvider');
+  const restartAiTasksBtn = document.getElementById('restartAiTasksBtn');
   // Context Menu Elements
   const folderContextMenu = document.getElementById('folder-context-menu');
   const deleteFolderBtn = document.getElementById('delete-folder-btn');
@@ -130,6 +131,9 @@ function initOptions(i18n, currentLang) {
   saveNotesBtn.addEventListener('click', handleSaveNotes); // Note this doesn't take params anymore
 
   // --- Event Listeners ---
+  if(restartAiTasksBtn) {
+    restartAiTasksBtn.addEventListener('click', handleRestartAiTasks);
+  }
   importBtn.addEventListener('click', handleImportBookmarks);
   searchInput.addEventListener('input', handleSearch);
   languageSelector.addEventListener('change', handleLanguageChange);
@@ -184,6 +188,30 @@ function initOptions(i18n, currentLang) {
     window.addEventListener('click', () => { folderContextMenu.style.display = 'none'; });
   }
 
+  if (qaSection) {
+      qaSection.addEventListener('click', (e) => {
+          const target = e.target;
+
+          // Handle "Add to Bookmarks" clicks
+          if (target.classList.contains('add-btn')) {
+              const { url, title, category, tags, description } = target.dataset;
+              addRecommendedSite(url, title, category, tags.split(','), description);
+              return;
+          }
+
+          // Handle "Visit Site" clicks
+          if (target.classList.contains('visit-btn')) {
+              openUrl(target.dataset.url);
+              return;
+          }
+
+          // Handle "Reset QA" clicks
+          if (target.id === 'resetQAButton') {
+              showQALoading(false);
+              return;
+          }
+      });
+  }
 
   // --- Init ---
   loadAllItems();
@@ -223,18 +251,21 @@ function initOptions(i18n, currentLang) {
 
     const buildTree = (parentId, level) => {
         const ul = document.createElement('ul');
+        // 使用 clientId 进行父子关系过滤
         const children = allItems.filter(item => item.parentId === parentId && item.type === 'folder');
         children.sort((a,b) => a.title.localeCompare(b.title));
         
         children.forEach(child => {
             const li = document.createElement('li');
-            const childCount = allItems.filter(i => i.parentId === child.id && i.type === 'bookmark').length;
+            // 核心修复：使用 child.clientId 来查找子书签数量和构建下一级树
+            const childCount = allItems.filter(i => i.parentId === child.clientId && i.type === 'bookmark').length;
             const itemEl = createTreeItem(child, level, childCount);
             li.appendChild(itemEl);
 
             const grandChildrenContainer = document.createElement('div');
             grandChildrenContainer.className = 'tree-item-children';
-            grandChildrenContainer.appendChild(buildTree(child.id, level + 1));
+            // 核心修复：将 child.clientId 作为下一级的 parentId 传递下去
+            grandChildrenContainer.appendChild(buildTree(child.clientId, level + 1));
             li.appendChild(grandChildrenContainer);
             
             ul.appendChild(li);
@@ -335,20 +366,28 @@ function initOptions(i18n, currentLang) {
       const id = target.dataset.id;
       const type = target.dataset.type;
 
+      // 处理文件夹类型的点击
       if (type === 'folder') {
           const isToggleClick = event.target.closest('.icon.toggle');
+          // 如果是点击折叠/展开图标
           if (isToggleClick) {
               target.classList.toggle('collapsed');
           } else {
+              // 如果是点击文件夹本身
               searchInput.value = '';
-              renderBookmarkList(id);
+              // 核心修复：在渲染列表前，先更新 activeFolderId 这个全局状态
+              activeFolderId = id; 
+              renderBookmarkList(activeFolderId);
           }
+      // 处理特殊文件夹（全部、星标）的点击
       } else if (type === 'special') {
           searchInput.value = '';
-          renderBookmarkList(id);
+          // 核心修复：同样，更新 activeFolderId
+          activeFolderId = id; 
+          renderBookmarkList(activeFolderId);
       }
   }
-  
+
   /**
    * Handles all click events within the main bookmark list container.
    * It delegates actions like starring, deleting, opening notes, etc., to their respective functions.
@@ -427,8 +466,12 @@ function initOptions(i18n, currentLang) {
   function handleStorageChange(changes) {
     if (changes.bookmarkItems) {
       allItems = changes.bookmarkItems.newValue || [];
-      if (!allItems.some(item => item.id === activeFolderId)) {
-          activeFolderId = 'root';
+      // 核心修复：使用 clientId 来检查活动文件夹是否存在
+      if (!allItems.some(item => item.clientId === activeFolderId)) {
+          // 如果当前激活的文件夹被删除了，则默认返回到'root'
+          if (activeFolderId !== 'root' && activeFolderId !== 'starred') {
+             activeFolderId = 'root';
+          }
       }
       renderFolderTree();
       if (searchInput.value.trim()) {
@@ -510,6 +553,24 @@ function initOptions(i18n, currentLang) {
     });
   }
 
+/**
+   * Handles the click event for the "Restart AI Analysis" button.
+   * Sends a message to the background script to force restart the AI task queue.
+   */
+  function handleRestartAiTasks() {
+    if (confirm("确定要强制重启AI分析任务吗？\n这将清空现有队列，并重新检查所有书签，为处理中、失败或内容不完整的书签重新创建任务。")) {
+      showToast("正在发送重启指令...", 2000, "#1976d2");
+      
+      chrome.runtime.sendMessage({ action: "forceRestartAiQueue" }, (response) => {
+        if (response && response.status === 'success') {
+          showToast(`已成功重新创建 ${response.restartedCount} 个AI分析任务。`, 4000, '#4CAF50');
+        } else {
+          showToast(`操作失败: ${response?.message || '未知错误'}`, 3000, "#ea4335");
+        }
+      });
+    }
+  }
+
   function handleImportBookmarks() {
     chrome.runtime.sendMessage({ action: "importBrowserBookmarks" }, response => {
       if (chrome.runtime.lastError || response?.status !== "success") {
@@ -562,12 +623,14 @@ function initOptions(i18n, currentLang) {
   function handleDeleteFolder() {
     if (!contextMenuFolderId) return;
 
-    const folderToDelete = allItems.find(item => item.id === contextMenuFolderId);
+    // 核心修复：使用 clientId 来查找待删除的文件夹
+    const folderToDelete = allItems.find(item => item.clientId === contextMenuFolderId);
     if (!folderToDelete) return;
     
     const confirmationMessage = i18n.get('confirmDeleteFolder', { folderName: folderToDelete.title });
     
     if (confirm(confirmationMessage)) {
+      // 发送到 background.js 的 ID 已经是 clientId，这部分是正确的
       chrome.runtime.sendMessage({ action: "deleteBookmark", id: contextMenuFolderId }, response => {
         if (chrome.runtime.lastError || response?.status !== "success") {
           showToast(i18n.get("operationFailed"), 2000, "#ff4444");
@@ -639,7 +702,7 @@ function initOptions(i18n, currentLang) {
   function createTreeItem(item, level, count) {
     const div = document.createElement('div');
     div.className = 'tree-item';
-    div.dataset.id = item.id;
+    div.dataset.id = item.clientId || item.id;
     div.dataset.type = item.type;
     div.style.paddingLeft = `${8 + level * 20}px`;
 
@@ -770,13 +833,13 @@ function initOptions(i18n, currentLang) {
       return div;
   }
 
-
   function getBreadcrumb(folderId) {
       if (folderId === 'root') return i18n.get('allBookmarks');
       let path = [];
       let currentId = folderId;
       while (currentId && currentId !== 'root') {
-          const folder = allItems.find(item => item.id === currentId);
+          // 核心修复：使用 clientId 来查找文件夹
+          const folder = allItems.find(item => item.clientId === currentId);
           if (folder) {
               path.unshift(folder.title);
               currentId = folder.parentId;
@@ -1291,7 +1354,7 @@ function initOptions(i18n, currentLang) {
         </div></div>`;
 
     qaInfo.innerHTML = html;
-    
+    /*
     setTimeout(() => {
       qaInfo.addEventListener('click', (e) => {
         if (e.target.classList.contains('visit-btn')) openUrl(e.target.dataset.url);
@@ -1303,6 +1366,7 @@ function initOptions(i18n, currentLang) {
       const resetBtn = document.getElementById('resetQAButton');
       if (resetBtn) resetBtn.addEventListener('click', () => showQALoading(false));
     }, 100);
+    */
   }
 
   function openUrl(url) { try { chrome.tabs.create({ url }); } catch (error) { window.open(url, '_blank'); } }

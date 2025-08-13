@@ -7,6 +7,7 @@ const API_BASE_URL = 'https://bookmarker-api.aiwetalk.com/api';
 // --- Task Queue Configuration ---
 let taskQueue = []; // Now stores only bookmark IDs
 let isProcessingQueue = false;
+let queueGeneration = 0; // 新增：任务世代计数器
 const CONCURRENT_LIMIT = 3; // Simultaneously process 3 AI tasks
 
 // --- Context Menu ID ---
@@ -45,7 +46,7 @@ async function enqueueTask(bookmarkId) {
     }
 
     taskQueue.push(bookmarkId);
-    processTaskQueue();
+    processTaskQueue(queueGeneration);
     return true;
 }
 
@@ -369,15 +370,117 @@ async function handleMessages(request, sender, sendResponse) {
                 break;
             }
             case 'importBrowserBookmarks': {
-                // This function remains unchanged as it correctly adds new items
-                // which will then be picked up by the sync process.
-                break;
-            }
+                (async () => {
+                    try {
+                        // const browserBookmarksTree = await chrome.bookmarks.getTree(); // 旧方式
+                        const { bookmarkItems: currentItems = [] } = await chrome.storage.local.get("bookmarkItems");
+
+                        const newItems = [];
+                        const existingUrlSet = new Set(currentItems.filter(i => i.type === 'bookmark').map(i => i.url));
+
+                        const folderMap = new Map();
+                        currentItems.forEach(item => {
+                            if (item.type === 'folder') {
+                                folderMap.set(`${item.parentId}-${item.title}`, item.clientId);
+                            }
+                        });
+
+                        const processNode = (node, extensionParentId) => {
+                            // 1. Process Folders first
+                            if (node.children) {
+                                let nextParentId;
+                                const folderTitle = node.title || 'Unnamed Folder'; // This is now safe because we skip the root.
+                                const folderMapKey = `${extensionParentId}-${folderTitle}`;
+
+                                if (folderMap.has(folderMapKey)) {
+                                    nextParentId = folderMap.get(folderMapKey);
+                                } else {
+                                    const newFolder = {
+                                        clientId: crypto.randomUUID(), serverId: null, parentId: extensionParentId,
+                                        title: folderTitle, dateAdded: new Date(node.dateAdded || Date.now()).toISOString(),
+                                        lastModified: new Date(node.dateAdded || Date.now()).toISOString(), type: 'folder'
+                                    };
+                                    newItems.push(newFolder);
+                                    nextParentId = newFolder.clientId;
+                                    folderMap.set(folderMapKey, nextParentId);
+                                }
+                                node.children.forEach(child => processNode(child, nextParentId));
+                            }
+
+                            // 2. Process Bookmarks
+                            if (node.url) {
+                                if (node.url.startsWith('javascript:') || node.url.startsWith('chrome:')) return;
+                                if (existingUrlSet.has(node.url)) return;
+
+                                const newBookmark = {
+                                    clientId: crypto.randomUUID(), serverId: null, parentId: extensionParentId,
+                                    title: node.title || 'No Title', url: node.url,
+                                    dateAdded: new Date(node.dateAdded || Date.now()).toISOString(),
+                                    lastModified: new Date(node.dateAdded || Date.now()).toISOString(),
+                                    type: 'bookmark', isStarred: false, category: '', summary: '', tags: [],
+                                    aiStatus: 'pending', notes: '', contentType: '', estimatedReadTime: null, readingLevel: ''
+                                };
+                                newItems.push(newBookmark);
+                                existingUrlSet.add(newBookmark.url);
+                            }
+                        };
+                        
+                        // --- 核心修复：跳过不可见的根节点，直接处理其子节点 ---
+                        // Get the single root node of the entire bookmark tree.
+                        const [rootNode] = await chrome.bookmarks.getTree();
+                        
+                        // If the root exists and has children (like "Bookmarks Bar", "Other Bookmarks"),
+                        // iterate over them and start the process. They will have our system's 'root' as their parent.
+                        if (rootNode && rootNode.children) {
+                            rootNode.children.forEach(childNode => processNode(childNode, 'root'));
+                        }
+                        // --- 修复结束 ---
+                        
+                        if (newItems.length > 0) {
+                            const allItems = [...newItems, ...currentItems];
+                            await chrome.storage.local.set({ bookmarkItems: allItems });
+                            
+                            const chunkSize = 50;
+                            let allSyncsSuccess = true;
+                            for (let i = 0; i < newItems.length; i += chunkSize) {
+                                const chunk = newItems.slice(i, i + chunkSize);
+                                const changesToSync = chunk.map(item => ({ type: 'add', payload: { ...item } }));
+                                const syncSuccess = await batchSyncChanges(changesToSync);
+                                if (!syncSuccess) {
+                                    allSyncsSuccess = false;
+                                    break;
+                                }
+                            }
+
+                            if (allSyncsSuccess) {
+                                const bookmarksToProcess = newItems.filter(item => item.type === 'bookmark');
+                                for (const bookmark of bookmarksToProcess) await enqueueTask(bookmark.clientId);
+                                sendResponse({ status: "success", count: bookmarksToProcess.length });
+                            } else {
+                                throw new Error("One or more chunks failed to sync with the server.");
+                            }
+                        } else {
+                            sendResponse({ status: "success", count: 0 });
+                        }
+                    } catch (error) {
+                        console.error("Critical error during bookmark import:", error);
+                        sendResponse({ status: "error", message: error.message });
+                    }
+                })();
+                return true;
+            }            
             case 'parseHTML': {
                 const text = await parseWithOffscreen(request.html);
                 sendResponse({ text: text });
                 break;
             }
+            case 'forceRestartAiQueue': {
+                (async () => {
+                    const restartedCount = await forceRestartAiQueue();
+                    sendResponse({ status: 'success', restartedCount });
+                })();
+                return true; // Keep channel open for async response
+            }            
             default:
                 sendResponse({ status: 'error', message: 'Unknown action' });
                 break;
@@ -816,6 +919,48 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
     chrome.storage.session.remove(tabId.toString());
 });
 
+// A more robust task queue processor that is resilient to individual task failures.
+async function processTaskQueue(generation) {
+    // 关键修复：检查当前任务处理器是否属于最新的世代。如果不是，立即退出。
+    if (generation !== queueGeneration) {
+        console.log(`Queue processor from generation ${generation} is now obsolete. Exiting.`);
+        return;
+    }
+
+    if (isProcessingQueue || taskQueue.length === 0) {
+        isProcessingQueue = false; // Ensure flag is reset if queue is empty
+        return;
+    }
+
+    isProcessingQueue = true;
+    const tasksToRun = taskQueue.splice(0, CONCURRENT_LIMIT);
+
+    console.log(`G${generation}: Processing a batch of ${tasksToRun.length} AI tasks.`);
+
+    const taskPromises = tasksToRun.map(id => {
+        return processBookmarkWithAI(id).catch(e => {
+            console.error(`G${generation}: A critical error occurred while processing bookmark ID ${id}:`, e);
+        });
+    });
+    
+    await Promise.allSettled(taskPromises);
+
+    // 关键修复：在继续下一个循环前，再次检查世代编号
+    if (generation !== queueGeneration) {
+        console.log(`Queue processor from generation ${generation} is now obsolete after batch completion. Exiting.`);
+        isProcessingQueue = false;
+        return;
+    }
+    
+    console.log(`G${generation}: Finished processing batch.`);
+    isProcessingQueue = false;
+
+    if (taskQueue.length > 0) {
+        setTimeout(() => processTaskQueue(generation), 1000); // 将世代编号传递给下一次调用
+    }
+}
+
+/*
 async function processTaskQueue() {
     if (isProcessingQueue || taskQueue.length === 0) return;
     isProcessingQueue = true;
@@ -824,10 +969,10 @@ async function processTaskQueue() {
     isProcessingQueue = false;
     if (taskQueue.length > 0) setTimeout(processTaskQueue, 500);
 }
+*/
 
 /**
- * Processes a single bookmark with AI to generate summary, tags, etc.
- * This function is designed to work with the dual-ID system (clientId/serverId).
+ * Processes a single bookmark with AI, using a hybrid content extraction strategy.
  *
  * @param {string} bookmarkClientId The stable, local-only UUID of the bookmark to process.
  */
@@ -835,17 +980,13 @@ async function processBookmarkWithAI(bookmarkClientId) {
     const { bookmarkItems: initialItems = [] } = await chrome.storage.local.get("bookmarkItems");
     let bookmark = initialItems.find(b => b.clientId === bookmarkClientId);
 
-    // If bookmark is not found (e.g., deleted while task was queued), abort.
     if (!bookmark) {
         console.warn(`AI Task: Could not find bookmark for clientId ${bookmarkClientId}. Aborting task.`);
         return;
     }
 
-    // Immediately set status to 'processing' for instant UI feedback.
-    // We use the helper function 'updateLocalBookmark' which also handles 'lastModified'.
     await updateLocalBookmark(bookmark.clientId, { aiStatus: 'processing', aiError: '' });
 
-    // Fetch AI configuration. Abort if no API key is set.
     const { aiConfig } = await chrome.storage.local.get("aiConfig");
     if (!aiConfig || !aiConfig.apiKey) {
         await updateLocalBookmark(bookmark.clientId, {
@@ -855,44 +996,81 @@ async function processBookmarkWithAI(bookmarkClientId) {
         return;
     }
 
+    let pageContent = '';
+    let extractionMethod = '';
+
     try {
-        // Step 1: Get content from the webpage.
-        let pageContent = await getPageContent(bookmark.url);
+        // --- 开始新的混合式内容提取策略 ---
 
-        // If content is insufficient, create fallback content from title and URL.
-        // If even that is empty, throw an error.
+        // 策略 1: 尝试从已打开的活动标签页直接获取内容
+        try {
+            const tabs = await chrome.tabs.query({ url: bookmark.url, status: 'complete' });
+            const accessibleTabs = (await Promise.all(tabs.map(async (tab) => {
+                const canAccess = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => true }).catch(() => false);
+                return canAccess ? tab : null;
+            }))).filter(Boolean);
+            
+            if (accessibleTabs.length > 0) {
+                const results = await chrome.scripting.executeScript({
+                    target: { tabId: accessibleTabs[0].id },
+                    func: () => document.body.innerText
+                });
+                if (results && results[0] && results[0].result) {
+                    pageContent = results[0].result;
+                    extractionMethod = 'Active Tab';
+                }
+            }
+        } catch (e) {
+            console.warn(`AI Task: Failed to extract content from active tab for ${bookmark.url}. Will fall back.`, e);
+        }
+
+        // 策略 2: 如果从活动标签页获取失败，则回退到后台fetch
         if (!pageContent || pageContent.trim().length < 50) {
-            let fallbackContent = bookmark.title ? bookmark.title + '. ' : '';
             try {
-                const urlObj = new URL(bookmark.url);
-                fallbackContent += `Site: ${urlObj.hostname.replace('www.', '')}. Path: ${urlObj.pathname.split('/').filter(p => p && isNaN(p)).join(' ').replace(/[-_]/g, ' ')}.`;
-            } catch (e) { /* ignore URL parsing errors */ }
-            pageContent = fallbackContent;
-
-            if (!pageContent || pageContent.trim().length === 0) {
-                throw new Error(chrome.i18n.getMessage("contentExtractionFailed"));
+                pageContent = await getPageContent(bookmark.url);
+                extractionMethod = 'Background Fetch';
+            } catch (fetchError) {
+                 // 捕获 fetch 错误 (如 403, 404, anetwork failure)
+                 console.warn(`AI Task: Background fetch failed for ${bookmark.url}. Error: ${fetchError.message}. Will use metadata fallback.`);
+                 pageContent = ''; // 确保 pageContent 为空，以触发最终备用方案
             }
         }
 
-        // Step 2: Call the AI for analysis.
-        const enhancedResult = await enhancedCallAI(aiConfig, pageContent, bookmark.url);
+        // 策略 3: 如果以上都失败，则使用元数据（标题和URL）作为最终备用方案
+        if (!pageContent || pageContent.trim().length < 50) {
+            extractionMethod = 'Metadata Fallback';
+            let fallbackContent = bookmark.title ? bookmark.title + '. ' : '';
+            try {
+                const urlObj = new URL(bookmark.url);
+                fallbackContent += `The content is from the domain ${urlObj.hostname.replace('www.', '')}. The path and topics might be related to ${urlObj.pathname.split('/').filter(p => p && isNaN(p)).join(' ').replace(/[-_]/g, ' ')}.`;
+            } catch (e) { /* ignore URL parsing errors */ }
+            
+            pageContent = fallbackContent;
 
-        // Step 3: On success, update the local bookmark with the new AI data.
+            if (!pageContent || pageContent.trim().length === 0) {
+                // 如果连标题和URL都没有，则任务彻底失败
+                throw new Error(chrome.i18n.getMessage("contentExtractionFailed"));
+            }
+        }
+        
+        console.log(`AI Task: Extracted content for ${bookmark.url} via [${extractionMethod}]`);
+        
+        // --- 内容提取结束，开始AI分析 ---
+        
+        const enhancedResult = await enhancedCallAI(aiConfig, pageContent, bookmark.url);
+        
         const updatedBookmark = await updateLocalBookmark(bookmark.clientId, {
             ...enhancedResult,
             aiStatus: 'completed',
             aiError: ''
         });
 
-        // Step 4: If the bookmark has already been synced (has a serverId),
-        // sync these new AI-generated fields to the server as an 'update'.
         if (updatedBookmark && updatedBookmark.serverId) {
-            console.log(`Syncing AI results for already-synced bookmark ${updatedBookmark.clientId}`);
             await syncItemChange('update', updatedBookmark);
         }
 
     } catch (error) {
-        // Step 5: On any failure, update the status to 'failed' and save the error message.
+        // 统一的错误处理
         console.error(`AI processing error for bookmark ${bookmark.clientId}:`, error);
         let userFriendlyError = error.message;
         if (error.message.includes('API key')) userFriendlyError = chrome.i18n.getMessage("errorApiKeyInvalid");
@@ -1217,3 +1395,141 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         //await syncItemChange('add', newBookmark);
     }
 });
+
+/**
+ * A new function to handle batch synchronization of multiple changes in a single request.
+ * This is crucial for bulk operations like importing bookmarks.
+ * @param {Array<object>} changes - An array of change objects, e.g., [{ type: 'add', payload: newItem }, ...]
+ * @returns {boolean} - True if the batch sync was successful, false otherwise.
+ */
+async function batchSyncChanges(changes) {
+    if (!changes || changes.length === 0) {
+        return true; // Nothing to sync
+    }
+
+    const token = await getJwt();
+    if (!token) {
+        console.log("Batch sync skipped: User not authenticated.");
+        return false;
+    }
+
+    console.log(`Starting batch sync for ${changes.length} items.`);
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/bookmarks/sync`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `${token}`
+            },
+            body: JSON.stringify(changes)
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            console.error("Batch sync request failed with status:", response.status, "Error:", errorBody);
+            return false;
+        }
+
+        const resultData = await response.json();
+        
+        // --- CRITICAL STEP: Back-populate serverId to local items ---
+        // After a successful sync, the server returns the newly created items with their server IDs (_id).
+        // We must update our local storage with these IDs.
+        
+        if (resultData.results && resultData.results.length > 0) {
+            const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+            let updated = false;
+
+            for (const result of resultData.results) {
+                // We only care about successful 'add' operations here
+                if (result.operation.type === 'add' && result.status === 'success' && result.data) {
+                    const clientId = result.operation.payload.clientId;
+                    const serverData = result.data; // This contains the new `_id`
+                    
+                    const itemIndex = bookmarkItems.findIndex(b => b.clientId === clientId);
+                    if (itemIndex !== -1) {
+                        // Update the local item with the serverId and any other canonical data from the server.
+                        bookmarkItems[itemIndex].serverId = serverData._id;
+                        // You can also merge other fields if the server modifies them
+                        // Object.assign(bookmarkItems[itemIndex], serverData);
+                        updated = true;
+                    }
+                }
+            }
+
+            if (updated) {
+                await chrome.storage.local.set({ bookmarkItems });
+                console.log("Batch sync successful. Local items updated with server IDs.");
+            }
+        }
+        return true;
+
+    } catch (e) {
+        console.error("Network error during batch sync:", e);
+        return false;
+    }
+}
+
+/**
+ * Forcefully clears and rebuilds the AI task queue based on the current state of bookmarks.
+ * This version includes a performance optimization to batch-update bookmark statuses.
+ * @returns {Promise<number>} - The number of tasks that were re-queued.
+ */
+async function forceRestartAiQueue() {
+    console.log("Force restarting AI task queue as requested by user...");
+
+    queueGeneration++;
+    console.log(`Advancing to queue generation: ${queueGeneration}`);
+
+    isProcessingQueue = false;
+    taskQueue = [];
+    
+    const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+
+    const itemsToReprocess = bookmarkItems.filter(item => {
+        if (item.type !== 'bookmark') return false;
+        const isIncompleteStatus = ['pending', 'processing', 'failed'].includes(item.aiStatus);
+        const isContentMissing = item.aiStatus === 'completed' && (!item.summary || !item.tags || item.tags.length === 0);
+        return isIncompleteStatus || isContentMissing;
+    });
+
+    if (itemsToReprocess.length === 0) {
+        console.log("No items found that require reprocessing.");
+        // Even if no items to reprocess, we still need to start the queue processor
+        // in case tasks were added while this function was running.
+        processTaskQueue(queueGeneration);
+        return 0;
+    }
+
+    // --- 性能优化：批量更新状态 ---
+    // 1. 创建一个包含所有需要重置状态的书签ID的Set，以便快速查找。
+    const reprocessSet = new Set(itemsToReprocess.map(item => item.clientId));
+    let requiresUpdate = false;
+
+    // 2. 在内存中遍历一次所有书签，修改需要重置的状态。
+    const updatedBookmarkItems = bookmarkItems.map(item => {
+        // 如果当前书签在需要重置的集合中，并且其状态不是'pending'
+        if (reprocessSet.has(item.clientId) && item.aiStatus !== 'pending') {
+            requiresUpdate = true; // 标记需要执行一次写操作
+            return { ...item, aiStatus: 'pending', aiError: '' };
+        }
+        return item; // 其他情况保持不变
+    });
+
+    // 3. 如果有任何状态被修改，则执行一次性的、批量的写回操作。
+    if (requiresUpdate) {
+        console.log("Batch updating bookmark statuses to 'pending'...");
+        await chrome.storage.local.set({ bookmarkItems: updatedBookmarkItems });
+    }
+    // --- 优化结束 ---
+    
+    // 4. 使用已过滤的列表重建任务队列（这部分不变）
+    taskQueue = itemsToReprocess.map(item => item.clientId);
+    console.log(`Rebuilt queue with ${taskQueue.length} tasks for generation ${queueGeneration}.`);
+
+    // 5. 启动新世代的任务处理器（这部分不变）
+    processTaskQueue(queueGeneration);
+
+    return taskQueue.length;
+}

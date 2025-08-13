@@ -194,12 +194,49 @@ async function onLoginSuccess(authData) {
 
 async function handleLogout() {
     await chrome.storage.local.remove('authData');
- //   await chrome.storage.local.set({ bookmarkItems: [] }); // Clear local data on logout
+    await chrome.storage.local.set({ bookmarkItems: [] }); // Clear local data on logout
     await updateUIForAuthState();
     alert('您已成功退出。');
     location.reload(); // Refresh the page to clear state
 }
 
+async function updateUIForAuthState() {
+    // --- 获取所有需要操作的UI元素 ---
+    const loggedOutView = document.getElementById('loggedOutView');
+    const loggedInView = document.getElementById('loggedInView');
+    const userAvatarImg = document.getElementById('userAvatar'); // 新增：获取头像的<img>元素
+    const userNameSpan = document.getElementById('userName');
+    const userEmailSpan = document.getElementById('userEmail');
+    
+    // --- 从存储中获取登录信息 ---
+    const { authData } = await chrome.storage.local.get('authData');
+
+    if (authData && authData.token) {
+        // --- 用户已登录 ---
+        loggedOutView.classList.add('hidden');
+        loggedInView.classList.remove('hidden');
+
+        const userName = "已认证用户"; // 使用这个作为显示名称
+        userNameSpan.textContent = userName;
+        userEmailSpan.textContent = `用户ID: ${authData.userId.substring(0, 10)}...`;
+
+        // --- 新增：生成并显示头像 ---
+        if (userAvatarImg) {
+            userAvatarImg.src = createAvatar({
+                userId: authData.userId, // 使用userId确保每个用户的颜色固定
+                text: userName.charAt(0) // 提取用户名的第一个字，即 "已"
+            });
+            userAvatarImg.style.borderRadius = '50%'; // 确保头像是圆形的
+            userAvatarImg.style.display = 'block'; // 确保头像是可见的
+        }
+
+    } else {
+        // --- 用户未登录 ---
+        loggedOutView.classList.remove('hidden');
+        loggedInView.classList.add('hidden');
+    }
+}
+/*
 async function updateUIForAuthState() {
     const { authData } = await chrome.storage.local.get('authData');
     const loggedOutView = document.getElementById('loggedOutView');
@@ -220,7 +257,7 @@ async function updateUIForAuthState() {
         loggedInView.classList.add('hidden');
     }
 }
-
+*/
 /**
  * Displays a short-lived notification message at the bottom of the screen.
  * @param {string} message The text to display.
@@ -251,4 +288,42 @@ function showToast(message, duration = 2000, color = "#4285f4") {
         toast.style.bottom = '0px';
         setTimeout(() => toast.remove(), 500);
     }, duration - 500);
+}
+
+/**
+ * 根据用户信息生成一个基于文本的头像
+ * @param {object} options - 配置项
+ * @param {string} options.userId - 用户ID，用于生成一个固定的背景颜色
+ * @param {string} options.text - 显示在头像上的文字（例如，用户名的第一个字）
+ * @param {number} [options.size=64] - 头像的尺寸（宽度和高度）
+ * @returns {string} - 返回一个可用于 <img> src 的 Data URL
+ */
+function createAvatar({ userId, text, size = 64 }) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = size;
+    canvas.height = size;
+
+    // --- 1. 根据用户ID生成一个固定的、漂亮的背景颜色 ---
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) {
+        hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const h = hash % 360; // 色相 (0-360)
+    // 使用 HSL 颜色模型，确保颜色既美观又不会太刺眼
+    const backgroundColor = `hsl(${h}, 55%, 50%)`;
+
+    // --- 2. 绘制背景 ---
+    context.fillStyle = backgroundColor;
+    context.fillRect(0, 0, size, size);
+
+    // --- 3. 在背景上绘制文字 ---
+    context.fillStyle = '#FFFFFF'; // 白色文字
+    context.font = `bold ${size / 2}px Arial`; // 字体大小为头像尺寸的一半
+    context.textAlign = 'center'; // 水平居中
+    context.textBaseline = 'middle'; // 垂直居中
+    context.fillText(text, size / 2, size / 2.1); // 微调垂直位置以获得更好的视觉效果
+
+    // --- 4. 将绘制的图像转换为 URL ---
+    return canvas.toDataURL();
 }
