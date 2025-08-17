@@ -1055,6 +1055,12 @@
     </ul>
   </div>
 
+<div id="loadingOverlay" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; color: white;">
+  <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
+  <p id="loadingMessage" style="margin-top: 20px;">正在导入书签，请稍候...</p>
+  <p id="progressMessage" style="margin-top: 10px; font-size: 14px;"></p> <!-- 用于显示进度 -->
+</div>
+
   <script src="i18n.js"></script>
   <script src="options.js"></script>
   <script src="options_demo.js"></script>

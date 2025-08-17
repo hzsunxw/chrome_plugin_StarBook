@@ -370,105 +370,12 @@ async function handleMessages(request, sender, sendResponse) {
                 break;
             }
             case 'importBrowserBookmarks': {
-                (async () => {
-                    try {
-                        // const browserBookmarksTree = await chrome.bookmarks.getTree(); // 旧方式
-                        const { bookmarkItems: currentItems = [] } = await chrome.storage.local.get("bookmarkItems");
-
-                        const newItems = [];
-                        const existingUrlSet = new Set(currentItems.filter(i => i.type === 'bookmark').map(i => i.url));
-
-                        const folderMap = new Map();
-                        currentItems.forEach(item => {
-                            if (item.type === 'folder') {
-                                folderMap.set(`${item.parentId}-${item.title}`, item.clientId);
-                            }
-                        });
-
-                        const processNode = (node, extensionParentId) => {
-                            // 1. Process Folders first
-                            if (node.children) {
-                                let nextParentId;
-                                const folderTitle = node.title || 'Unnamed Folder'; // This is now safe because we skip the root.
-                                const folderMapKey = `${extensionParentId}-${folderTitle}`;
-
-                                if (folderMap.has(folderMapKey)) {
-                                    nextParentId = folderMap.get(folderMapKey);
-                                } else {
-                                    const newFolder = {
-                                        clientId: crypto.randomUUID(), serverId: null, parentId: extensionParentId,
-                                        title: folderTitle, dateAdded: new Date(node.dateAdded || Date.now()).toISOString(),
-                                        lastModified: new Date(node.dateAdded || Date.now()).toISOString(), type: 'folder'
-                                    };
-                                    newItems.push(newFolder);
-                                    nextParentId = newFolder.clientId;
-                                    folderMap.set(folderMapKey, nextParentId);
-                                }
-                                node.children.forEach(child => processNode(child, nextParentId));
-                            }
-
-                            // 2. Process Bookmarks
-                            if (node.url) {
-                                if (node.url.startsWith('javascript:') || node.url.startsWith('chrome:')) return;
-                                if (existingUrlSet.has(node.url)) return;
-
-                                const newBookmark = {
-                                    clientId: crypto.randomUUID(), serverId: null, parentId: extensionParentId,
-                                    title: node.title || 'No Title', url: node.url,
-                                    dateAdded: new Date(node.dateAdded || Date.now()).toISOString(),
-                                    lastModified: new Date(node.dateAdded || Date.now()).toISOString(),
-                                    type: 'bookmark', isStarred: false, category: '', summary: '', tags: [],
-                                    aiStatus: 'pending', notes: '', contentType: '', estimatedReadTime: null, readingLevel: ''
-                                };
-                                newItems.push(newBookmark);
-                                existingUrlSet.add(newBookmark.url);
-                            }
-                        };
-                        
-                        // --- 核心修复：跳过不可见的根节点，直接处理其子节点 ---
-                        // Get the single root node of the entire bookmark tree.
-                        const [rootNode] = await chrome.bookmarks.getTree();
-                        
-                        // If the root exists and has children (like "Bookmarks Bar", "Other Bookmarks"),
-                        // iterate over them and start the process. They will have our system's 'root' as their parent.
-                        if (rootNode && rootNode.children) {
-                            rootNode.children.forEach(childNode => processNode(childNode, 'root'));
-                        }
-                        // --- 修复结束 ---
-                        
-                        if (newItems.length > 0) {
-                            const allItems = [...newItems, ...currentItems];
-                            await chrome.storage.local.set({ bookmarkItems: allItems });
-                            
-                            const chunkSize = 50;
-                            let allSyncsSuccess = true;
-                            for (let i = 0; i < newItems.length; i += chunkSize) {
-                                const chunk = newItems.slice(i, i + chunkSize);
-                                const changesToSync = chunk.map(item => ({ type: 'add', payload: { ...item } }));
-                                const syncSuccess = await batchSyncChanges(changesToSync);
-                                if (!syncSuccess) {
-                                    allSyncsSuccess = false;
-                                    break;
-                                }
-                            }
-
-                            if (allSyncsSuccess) {
-                                const bookmarksToProcess = newItems.filter(item => item.type === 'bookmark');
-                                for (const bookmark of bookmarksToProcess) await enqueueTask(bookmark.clientId);
-                                sendResponse({ status: "success", count: bookmarksToProcess.length });
-                            } else {
-                                throw new Error("One or more chunks failed to sync with the server.");
-                            }
-                        } else {
-                            sendResponse({ status: "success", count: 0 });
-                        }
-                    } catch (error) {
-                        console.error("Critical error during bookmark import:", error);
-                        sendResponse({ status: "error", message: error.message });
-                    }
-                })();
-                return true;
-            }            
+                importBrowserBookmarks(sendResponse).catch(err => {
+                    console.error("Error caught in handleMessages for import:", err);
+                    sendResponse({ status: 'error', message: err.message });
+                });
+                return true; // 告诉 Chrome 扩展，我们将异步地调用 sendResponse
+            }
             case 'parseHTML': {
                 const text = await parseWithOffscreen(request.html);
                 sendResponse({ text: text });
@@ -492,6 +399,169 @@ async function handleMessages(request, sender, sendResponse) {
 }
 
 /**
+ * 导入浏览器书签的主函数。
+ * 严格遵循“先上传文件夹，再上传书签”的两步法，从根本上解决父子关系同步问题。
+ * @param {function} sendResponse - 用于向调用方返回结果的回调函数。
+ */
+async function importBrowserBookmarks(sendResponse) {
+    try {
+        console.log("Starting final, simplified two-step import process...");
+
+        // --- 1. 数据准备 (不变) ---
+        const { bookmarkItems: currentItems = [] } = await chrome.storage.local.get("bookmarkItems");
+        const newFolders = [];
+        const newBookmarks = [];
+        // ... [此处省略与上一版相同的、完整的数据准备逻辑] ...
+        const existingUrlSet = new Set(currentItems.filter(i => i.type === 'bookmark').map(i => i.url));
+        const serverIdToClientIdMap = new Map();
+        currentItems.forEach(item => {
+            if (item.serverId && item.clientId) serverIdToClientIdMap.set(item.serverId, item.clientId);
+        });
+        const folderMap = new Map();
+        currentItems.forEach(item => {
+            if (item.type === 'folder') {
+                let parentClientId = item.parentId;
+                if (parentClientId !== 'root' && serverIdToClientIdMap.has(parentClientId)) {
+                    parentClientId = serverIdToClientIdMap.get(parentClientId);
+                }
+                const key = `${parentClientId}-${item.title}`;
+                folderMap.set(key, { clientId: item.clientId, serverId: item.serverId });
+            }
+        });
+        const processNode = (node, parentInfo) => {
+            if (node.children) {
+                let nextParentInfo;
+                const folderTitle = node.title || 'Unnamed Folder';
+                const folderMapKey = `${parentInfo.clientId}-${folderTitle}`;
+                if (folderMap.has(folderMapKey)) {
+                    nextParentInfo = folderMap.get(folderMapKey);
+                } else {
+                    const newFolder = {
+                        clientId: crypto.randomUUID(), parentId: parentInfo.clientId, title: folderTitle, type: 'folder',
+                        dateAdded: new Date(node.dateAdded || Date.now()).toISOString(), lastModified: new Date(node.dateAdded || Date.now()).toISOString(), notes: ''
+                    };
+                    newFolders.push(newFolder);
+                    nextParentInfo = { clientId: newFolder.clientId, serverId: null };
+                    folderMap.set(folderMapKey, nextParentInfo);
+                }
+                node.children.forEach(child => processNode(child, nextParentInfo));
+            } else if (node.url) {
+                if (node.url.startsWith('javascript:') || node.url.startsWith('chrome:')) return;
+                if (existingUrlSet.has(node.url)) return;
+                const newBookmark = {
+                    clientId: crypto.randomUUID(), parentId: parentInfo.clientId, title: node.title || 'No Title',
+                    url: node.url, type: 'bookmark', isStarred: false, summary: '', tags: [], aiStatus: 'pending',
+                    notes: '', contentType: '', estimatedReadTime: null, readingLevel: ''
+                };
+                newBookmarks.push(newBookmark);
+            }
+        };
+        const [rootNode] = await chrome.bookmarks.getTree();
+        if (rootNode && rootNode.children) {
+            rootNode.children.forEach(childNode => processNode(childNode, { clientId: 'root' }));
+        }
+        const totalNewItems = newFolders.length + newBookmarks.length;
+        if (totalNewItems === 0) {
+            sendResponse({ status: "success", count: 0 });
+            return;
+        }
+
+        // --- 2. 第一步：上传文件夹并更新内存中的 serverId ---
+        const translationMap = new Map();
+        currentItems.forEach(item => {
+            if (item.type === 'folder' && item.clientId && item.serverId) {
+                translationMap.set(item.clientId, item.serverId);
+            }
+        });
+        if (newFolders.length > 0) {
+            const folderChanges = newFolders.map(folder => ({ type: 'add', payload: folder }));
+            const token = await getJwt();
+            const response = await fetch(`${API_BASE_URL}/items/sync`, { body: JSON.stringify(folderChanges), method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `${token}` } });
+            if (!response.ok) throw new Error("Failed to upload folders.");
+            const results = await response.json();
+            results.results?.forEach(res => {
+                if (res.status === 'success' && res.operation.type === 'add') {
+                    const clientId = res.operation.payload.clientId;
+                    const serverData = res.data;
+                    translationMap.set(clientId, serverData._id);
+                    const folderIndex = newFolders.findIndex(f => f.clientId === clientId);
+                    if (folderIndex !== -1) {
+                        newFolders[folderIndex] = { ...newFolders[folderIndex], ...serverData, serverId: serverData._id };
+                    }
+                }
+            });
+        }
+
+        // --- 3. 第二步：上传书签并更新内存中的 serverId ---
+        if (newBookmarks.length > 0) {
+            const bookmarkChanges = newBookmarks.map(bm => ({
+                type: 'add',
+                payload: { ...bm, parentId: translationMap.get(bm.parentId) || bm.parentId }
+            }));
+            const chunkSize = 50;
+            const token = await getJwt();
+            for (let i = 0; i < bookmarkChanges.length; i += chunkSize) {
+                const chunk = bookmarkChanges.slice(i, i + chunkSize);
+                const response = await fetch(`${API_BASE_URL}/items/sync`, { body: JSON.stringify(chunk), method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `${token}` } });
+                if (!response.ok) throw new Error("Failed to upload a bookmark chunk.");
+                const results = await response.json();
+                results.results?.forEach(res => {
+                    if (res.status === 'success' && res.operation.type === 'add') {
+                        const clientId = res.operation.payload.clientId;
+                        const serverData = res.data;
+                        const bookmarkIndex = newBookmarks.findIndex(b => b.clientId === clientId);
+                        if (bookmarkIndex !== -1) {
+                            newBookmarks[bookmarkIndex] = { ...newBookmarks[bookmarkIndex], ...serverData, serverId: serverData._id };
+                        }
+                    }
+                });
+            }
+        }
+
+        // --- 4. 最终化：在内存中整合所有数据，并进行最终的 parentId 统一 ---
+        console.log("Finalizing: Merging data in memory and unifying parentIds...");
+        
+        // a. 合并所有数据源：已存在的、新文件夹、新书签
+        const allItems = [...currentItems, ...newFolders, ...newBookmarks];
+
+        // b. 创建一个包含所有项目ID的最终映射表
+        const finalTranslationMap = new Map();
+        allItems.forEach(item => {
+            if(item.clientId && item.serverId) {
+                finalTranslationMap.set(item.clientId, item.serverId);
+            }
+        });
+
+        // c. 遍历所有项目，统一 parentId
+        const finalItemsToStore = allItems.map(item => {
+            let finalParentId = item.parentId;
+            if (finalParentId && finalParentId !== 'root' && finalTranslationMap.has(finalParentId)) {
+                finalParentId = finalTranslationMap.get(finalParentId);
+            }
+            return { ...item, parentId: finalParentId };
+        });
+
+        // d. 将最终的、完全正确的数据一次性写入存储
+        await chrome.storage.local.set({ bookmarkItems: finalItemsToStore });
+        console.log("Local storage has been updated with final, consistent data.");
+
+        // --- 5. 创建AI任务 ---
+        // 这一步现在可以安全地执行，因为存储中的 clientId 是正确的
+        const clientIdsToEnqueue = newBookmarks.map(b => b.clientId);
+        if (clientIdsToEnqueue.length > 0) {
+            taskQueue.push(...clientIdsToEnqueue);
+            processTaskQueue(queueGeneration);
+        }
+
+        sendResponse({ status: "success", count: totalNewItems });
+
+    } catch (error) {
+        console.error("Critical error during the import process:", error);
+        sendResponse({ status: "error", message: error.message });
+    }
+}
+
+/**
  * Sends a single, specific change (add, update, or delete) to the server's batch sync endpoint.
  * This function is designed for real-time synchronization of individual actions.
  * It also handles the crucial process of populating the `serverId` for newly added bookmarks.
@@ -502,90 +572,64 @@ async function handleMessages(request, sender, sendResponse) {
  * - For 'update'/'delete', it must contain a `serverId`.
  */
 async function syncItemChange(type, payload) {
-    const token = await getJwt(); //
+    const token = await getJwt();
     if (!token) {
-        // If the user is not logged in, we cannot sync. The change remains local.
-        console.log("Sync skipped: User not authenticated."); //
+        console.log("Sync skipped: User not authenticated.");
         return;
     }
 
-    // Create a deep copy of the payload to avoid modifying the original object.
-    let apiPayload = JSON.parse(JSON.stringify(payload)); //
+    let apiPayload = JSON.parse(JSON.stringify(payload));
     
-    // --- Prepare the payload based on the operation type ---
     if (type === 'add') {
-        // For a new item, the server needs the `clientId` to link the response back to the request.
-        // The `apiPayload` already contains the clientId from the local bookmark object.
-        // We remove fields that should not be stored on the server, like serverId (which is null anyway).
         delete apiPayload.serverId;
-        delete apiPayload.id; // Remove deprecated id field if it exists
-
-    } else { // For 'update' or 'delete'
+    } else {
         if (!payload.serverId) {
-            // This is a critical safeguard. We cannot update or delete an item on the server
-            // without knowing its unique server ID.
             console.warn("Sync aborted for update/delete: serverId is missing.", payload);
             return;
         }
-        // The server's API expects the ID field to be named `_id`.
-        apiPayload._id = payload.serverId; //
-        
-        // Clean up local-only identifiers from the payload sent to the server.
+        apiPayload._id = payload.serverId;
         delete apiPayload.clientId;
         delete apiPayload.serverId;
-        delete apiPayload.id;
     }
 
-    // The sync API expects an array of change operations.
-    const change = { type, payload: apiPayload }; //
+    const change = { type, payload: apiPayload };
 
     try {
-        const response = await fetch(`${API_BASE_URL}/bookmarks/sync`, {
-            method: 'POST', //
+        // MODIFICATION: Updated endpoint from /bookmarks/sync to /items/sync
+        const response = await fetch(`${API_BASE_URL}/items/sync`, {
+            method: 'POST',
             headers: { 
-                'Content-Type': 'application/json', //
-                'Authorization': `${token}` //
+                'Content-Type': 'application/json',
+                'Authorization': `${token}`
             },
-            body: JSON.stringify([change]) //
+            body: JSON.stringify([change])
         });
 
-        if (response.ok) { //
+        if (response.ok) {
             const resultData = await response.json();
             
-            // --- Handle the response, especially for the 'add' operation ---
             if (type === 'add' && resultData.results && resultData.results.length > 0) {
-                // Find the result that corresponds to our added item by matching the clientId.
                 const addResult = resultData.results.find(r => r.operation.payload.clientId === payload.clientId);
                 
                 if (addResult && addResult.status === 'success' && addResult.data) {
-                    const serverData = addResult.data; // This object contains the new `_id` from the server.
-                    
-                    // --- ID Population ---
-                    // Now, update the local bookmark with the `serverId` received from the server.
-                    // This links the local item to the server item permanently.
+                    const serverData = addResult.data;
                     await updateLocalBookmark(payload.clientId, { 
-                        serverId: serverData._id, // Set the serverId
-                        // Optionally, update with any other authoritative data from the server
-                        // For example, if the server cleans up or adds fields.
+                        serverId: serverData._id,
                         ...serverData 
                     });
-                    console.log(`Bookmark ${payload.clientId} successfully synced. ServerId set to ${serverData._id}.`);
+                    console.log(`Item ${payload.clientId} successfully synced. ServerId set to ${serverData._id}.`);
                 }
             } else {
-                // For successful update/delete operations.
                 console.log(`Sync successful for operation: '${type}' on item with serverId: ${payload.serverId}`);
             }
         } else {
-            // Handle API errors (e.g., 400, 401, 500).
             const errorBody = await response.json();
-            console.error("Sync change failed with status:", response.status, "Error:", errorBody); //
+            console.error("Sync change failed with status:", response.status, "Error:", errorBody);
         }
     } catch (e) {
-        // Handle network errors (e.g., no internet connection).
-        console.error("Network error during sync change:", e); //
+        console.error("Network error during sync change:", e);
     }
 }
-
 
 /*
 async function syncItemChange(type, payload) {
@@ -747,10 +791,14 @@ async function updateLocalBookmark(bookmarkId, updates) {
 }
 */
 
+
 /**
- * Initiates a robust, two-way merge synchronization.
- * This function acts as the single source of truth for reconciling local and server data.
- * It follows a "push-then-pull" strategy to ensure the client becomes fully aligned with the server.
+ * 启动一个健壮的双向合并同步过程。
+ * 1. 从服务器和本地获取所有项目。
+ * 2. 比较两者，计算出需要推送到服务器的本地变更（增、改）。
+ * 3. 将这些变更分块推送到服务器，以避免请求体过大。
+ * 4. 将服务器上新增的项目拉取到本地。
+ * 5. 在客户端执行最终的 parentId 统一，确保数据一致性，然后保存。
  */
 async function initiateMergeSync() {
     console.log("Starting bidirectional merge sync...");
@@ -761,135 +809,138 @@ async function initiateMergeSync() {
     }
 
     try {
-        // Step 1: Concurrently fetch all bookmarks from the server and local storage.
+        // --- 1. 获取服务器和本地数据 ---
         const [serverResponse, localData] = await Promise.all([
-            fetch(`${API_BASE_URL}/bookmarks/all`, { headers: { 'Authorization': `${token}` } }),
+            fetch(`${API_BASE_URL}/items/all`, { headers: { 'Authorization': `${token}` } }),
             chrome.storage.local.get("bookmarkItems")
         ]);
 
         if (!serverResponse.ok) {
-            throw new Error(`Failed to fetch bookmarks from server. Status: ${serverResponse.status}`);
+            throw new Error(`Failed to fetch server items. Status: ${serverResponse.status}`);
         }
 
-        const serverBookmarksRaw = await serverResponse.json();
-        const localBookmarks = localData.bookmarkItems || [];
-
-        // Create a map of server bookmarks for efficient O(1) lookups by serverId.
-        const serverMap = new Map(serverBookmarksRaw.map(b => [b._id, b]));
-
+        const serverItemsRaw = await serverResponse.json();
+        const localItems = localData.bookmarkItems || [];
+        const serverMap = new Map(serverItemsRaw.map(b => [b._id, b]));
+        
         const changesToPush = [];
-        const finalBookmarks = []; // This will hold the final, merged list of bookmarks.
+        let finalItems = [];
 
-        // Step 2: Iterate through all local bookmarks to compare them with server data.
-        for (const local of localBookmarks) {
-            // A truly new item is one that has never been synced and thus has no serverId.
+        // --- 2. 核心合并逻辑：比较本地与服务器差异 ---
+        for (const local of localItems) {
             const isTrulyNew = !local.serverId;
             const serverEquivalent = local.serverId ? serverMap.get(local.serverId) : null;
 
             if (isTrulyNew) {
-                // --- Situation A: This is a new bookmark created locally. ---
-                console.log(`Sync: Found new local bookmark to ADD: '${local.title}'`);
-                // Prepare the payload for the 'add' operation. Use clientId for tracking.
-                const payload = { ...local, id: undefined }; // Don't send the deprecated 'id' field
-                changesToPush.push({ type: "add", payload: { ...payload, clientId: local.clientId } });
-                // Add the local version as a placeholder. It will be replaced by the server's authoritative version after the sync.
-                finalBookmarks.push(local);
-
+                // 本地新建的项目，需要推送到服务器
+                changesToPush.push({ type: "add", payload: { ...local, clientId: local.clientId } });
+                finalItems.push(local);
             } else if (serverEquivalent) {
-                // --- Situation B: The bookmark exists on both local and server. ---
-                // We must decide which version to keep based on the last modification time.
+                // 两端都存在的项目，比较最后修改时间
                 const localDate = new Date(local.lastModified || 0);
                 const serverDate = new Date(serverEquivalent.lastModified || 0);
 
                 if (localDate > serverDate) {
-                    // Local version is newer, so prepare to update the server.
-                    console.log(`Sync: Found newer local bookmark to UPDATE: '${local.title}'`);
-                    changesToPush.push({ type: "update", payload: { ...local, _id: local.serverId, id: undefined } });
-                    finalBookmarks.push(local); // Keep the newer local version.
+                    // 本地版本较新，需要推送到服务器
+                    changesToPush.push({ type: "update", payload: { ...local, _id: local.serverId } });
+                    finalItems.push(local);
                 } else {
-                    // Server version is newer or the same, so adopt the server's version.
-                    finalBookmarks.push({ ...serverEquivalent, clientId: local.clientId }); // Keep existing clientId
+                    // 服务器版本较新或一致，采用服务器版本
+                    finalItems.push({ ...serverEquivalent, clientId: local.clientId, serverId: serverEquivalent._id });
                 }
-                // Remove the entry from the server map since it has been processed.
+                // 从map中移除已处理的项目
                 serverMap.delete(local.serverId);
-
-            } else {
-                // --- Situation C: The bookmark has a serverId but is not on the server. ---
-                // This means it was deleted on another device. We will remove it locally
-                // by simply not adding it to the `finalBookmarks` array.
-                console.log(`Sync: Item '${local.title}' was deleted on another device. Removing locally.`);
             }
+            // 如果本地有，服务器没有，则说明在别处被删除，此处不加入 finalItems 即可实现本地删除
         }
 
-        // Step 3: Handle bookmarks that are only on the server.
-        // Any items remaining in the serverMap are new to this client. Add them to the final list.
-        for (const serverBookmark of serverMap.values()) {
-            console.log(`Sync: Found new server bookmark to PULL: '${serverBookmark.title}'`);
-            finalBookmarks.push({ ...serverBookmark, clientId: serverBookmark._id }); // Use serverId as clientId for new items
+        // --- 3. 将服务器上独有的项目添加到最终列表 ---
+        for (const serverItem of serverMap.values()) {
+            // 对于从服务器拉取的新项目，使用 serverId 作为其本地的 clientId 以保持稳定
+            finalItems.push({ ...serverItem, clientId: serverItem._id, serverId: serverItem._id });
         }
 
-        // Step 4: If there are local changes, push them to the server in a single batch request.
+        // --- 4. 分块推送本地变更 ---
         if (changesToPush.length > 0) {
-            console.log(`Sync: Pushing ${changesToPush.length} local changes (add/update) to the server.`);
-            const syncResponse = await fetch(`${API_BASE_URL}/bookmarks/sync`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `${token}` },
-                body: JSON.stringify(changesToPush)
-            });
-
-            if (!syncResponse.ok) {
-                throw new Error('Failed to sync local changes to the server.');
-            }
+            console.log(`Sync: Found ${changesToPush.length} local changes to push in chunks.`);
             
-            // --- The crucial "ID population" step for newly added items ---
-            const syncResults = await syncResponse.json();
-            if (syncResults.results) {
-                for (const result of syncResults.results) {
-                    if (result.operation.type === 'add' && result.status === 'success') {
-                        const clientId = result.operation.payload.clientId;
-                        const serverData = result.data; // This is the full bookmark data from the server, including the new _id
-                        
-                        // Find the placeholder in our final list and replace it with the complete server version.
-                        const indexToReplace = finalBookmarks.findIndex(b => b.clientId === clientId);
-                        if (indexToReplace !== -1) {
-                            // Replace the temporary local version with the authoritative server version, preserving the clientId.
-                            finalBookmarks[indexToReplace] = { ...serverData, clientId: clientId };
+            const chunkSize = 50; // 每个块的大小，防止请求体过大
+            for (let i = 0; i < changesToPush.length; i += chunkSize) {
+                const chunk = changesToPush.slice(i, i + chunkSize);
+                console.log(`Pushing chunk ${Math.floor(i / chunkSize) + 1}...`);
+
+                const syncResponse = await fetch(`${API_BASE_URL}/items/sync`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `${token}` },
+                    body: JSON.stringify(chunk)
+                });
+
+                if (!syncResponse.ok) {
+                    throw new Error('Failed to sync local changes to the server.');
+                }
+                
+                // 处理成功的add操作，将返回的 serverId 更新到 finalItems 中
+                const syncResults = await syncResponse.json();
+                if (syncResults.results) {
+                    for (const result of syncResults.results) {
+                        if (result.operation.type === 'add' && result.status === 'success') {
+                            const clientId = result.operation.payload.clientId;
+                            const serverData = result.data;
+                            const indexToReplace = finalItems.findIndex(b => b.clientId === clientId);
+                            if (indexToReplace !== -1) {
+                                // 合并服务器返回的数据，同时保留原始的 clientId
+                                finalItems[indexToReplace] = { ...finalItems[indexToReplace], ...serverData, serverId: serverData._id };
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Step 5: Format the final, merged list and update local storage.
-        const finalBookmarksToStore = finalBookmarks.map(bookmark => {
-            // The object from the server has `_id`. We map it to `serverId` for consistency.
-            const serverId = bookmark._id || bookmark.serverId;
-            const finalBookmark = {
-                ...bookmark,
-                serverId: serverId, // Ensure serverId is set
-                id: undefined,      // Remove the deprecated 'id' field
-                _id: undefined      // Remove the MongoDB '_id' field
-            };
-            
-            // A small data integrity check
-            if (finalBookmark.summary && !finalBookmark.aiStatus) {
-                finalBookmark.aiStatus = 'completed';
+        // --- 5. 最终的 parentId 统一和保存逻辑 (之前省略的部分) ---
+        // a. 基于合并后的完整列表，建立一个 clientId -> serverId 的最终映射表
+        const clientToServerIdMap = new Map();
+        finalItems.forEach(item => {
+            const serverId = item.serverId || item._id;
+            if (item.clientId && serverId) {
+                clientToServerIdMap.set(item.clientId, serverId);
             }
-            
-            return finalBookmark;
         });
 
-        await chrome.storage.local.set({ bookmarkItems: finalBookmarksToStore });
-        console.log(`Robust merge sync complete. Local store updated with ${finalBookmarksToStore.length} items.`);
+        // b. 遍历最终列表，将所有 clientId 类型的 parentId 替换为 serverId
+        const finalItemsToStore = finalItems.map(item => {
+            let finalParentId = item.parentId;
+            if (finalParentId && finalParentId !== 'root' && clientToServerIdMap.has(finalParentId)) {
+                finalParentId = clientToServerIdMap.get(finalParentId);
+            }
+            
+            const serverId = item.serverId || item._id;
+            
+            // c. 清理数据结构，确保本地存储格式统一
+            const finalItem = {
+                ...item,
+                parentId: finalParentId,
+                serverId: serverId,
+            };
+            delete finalItem._id; // 移除服务器特有的 _id 字段
+            delete finalItem.id;  // 移除可能存在的旧的 id 字段
 
-        return { status: "success", count: finalBookmarksToStore.length, message: "Sync completed successfully" };
+            return finalItem;
+        });
+
+        // d. 将完全统一和清理后的数据保存到本地存储
+        await chrome.storage.local.set({ bookmarkItems: finalItemsToStore });
+        
+        console.log(`Merge sync complete. Local store updated with ${finalItemsToStore.length} items.`);
+        return { status: "success", count: finalItemsToStore.length };
 
     } catch (e) {
+        // --- 6. 错误处理 ---
         console.error("An error occurred during the robust merge sync process:", e);
+        // 返回一个包含错误信息的对象，以便调用方可以处理
         return { status: "error", message: e.message };
     }
 }
-
 
 // --- All other functions (AI processing, context menus, tab listeners, etc.) remain unchanged ---
 // ... (The rest of the original background.js file from processTaskQueue onwards)
@@ -1404,7 +1455,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
  */
 async function batchSyncChanges(changes) {
     if (!changes || changes.length === 0) {
-        return true; // Nothing to sync
+        return true;
     }
 
     const token = await getJwt();
@@ -1416,7 +1467,7 @@ async function batchSyncChanges(changes) {
     console.log(`Starting batch sync for ${changes.length} items.`);
 
     try {
-        const response = await fetch(`${API_BASE_URL}/bookmarks/sync`, {
+        const response = await fetch(`${API_BASE_URL}/items/sync`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1433,34 +1484,48 @@ async function batchSyncChanges(changes) {
 
         const resultData = await response.json();
         
-        // --- CRITICAL STEP: Back-populate serverId to local items ---
-        // After a successful sync, the server returns the newly created items with their server IDs (_id).
-        // We must update our local storage with these IDs.
-        
         if (resultData.results && resultData.results.length > 0) {
             const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
-            let updated = false;
+            let itemsWereUpdated = false;
 
+            // Step 1: Update serverId for newly added items
             for (const result of resultData.results) {
-                // We only care about successful 'add' operations here
                 if (result.operation.type === 'add' && result.status === 'success' && result.data) {
                     const clientId = result.operation.payload.clientId;
-                    const serverData = result.data; // This contains the new `_id`
+                    const serverData = result.data;
                     
                     const itemIndex = bookmarkItems.findIndex(b => b.clientId === clientId);
                     if (itemIndex !== -1) {
-                        // Update the local item with the serverId and any other canonical data from the server.
                         bookmarkItems[itemIndex].serverId = serverData._id;
-                        // You can also merge other fields if the server modifies them
-                        // Object.assign(bookmarkItems[itemIndex], serverData);
-                        updated = true;
+                        itemsWereUpdated = true;
                     }
                 }
             }
 
-            if (updated) {
-                await chrome.storage.local.set({ bookmarkItems });
-                console.log("Batch sync successful. Local items updated with server IDs.");
+            if (itemsWereUpdated) {
+                // --- START OF FIX ---
+                // After serverIds are populated, we MUST unify the parentIds
+
+                // 1. Create a map from every item's clientId to its new serverId.
+                const clientToServerIdMap = new Map();
+                bookmarkItems.forEach(item => {
+                    if (item.clientId && item.serverId) {
+                        clientToServerIdMap.set(item.clientId, item.serverId);
+                    }
+                });
+
+                // 2. Iterate again and "upgrade" any parentId that is a clientId to its serverId equivalent.
+                const finalBookmarkItems = bookmarkItems.map(item => {
+                    let finalParentId = item.parentId;
+                    if (finalParentId && finalParentId !== 'root' && clientToServerIdMap.has(finalParentId)) {
+                        finalParentId = clientToServerIdMap.get(finalParentId);
+                    }
+                    return { ...item, parentId: finalParentId };
+                });
+
+                await chrome.storage.local.set({ bookmarkItems: finalBookmarkItems });
+                console.log("Batch sync successful. Local items updated with server IDs and parentIds unified.");
+                // --- END OF FIX ---
             }
         }
         return true;

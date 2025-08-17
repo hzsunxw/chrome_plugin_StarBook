@@ -121,6 +121,11 @@ function initOptions(i18n, currentLang) {
   const notesEditTextarea = document.getElementById('notesEditTextarea'); // <-- Add this
   const notesEditTitle = document.getElementById('notesEditTitle');     // <-- Add this
 
+  //更新开始
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const loadingMessage = document.getElementById('loadingMessage');
+  const progressMessage = document.getElementById('progressMessage');
+
   // 检查关键元素是否存在
   if (!importBtn || !searchInput || !languageSelector || !folderTreeContainer || !bookmarkListContainer) {
     throw new Error('Critical DOM elements not found');
@@ -245,27 +250,34 @@ function initOptions(i18n, currentLang) {
     ];
 
     specialFolders.forEach(folder => {
-        const itemEl = createTreeItem({ id: folder.id, title: i18n.get(folder.titleKey), type: 'special', icon: folder.icon }, 0, folder.count);
+        const itemEl = createTreeItem({ id: folder.id, title: i18n.get(folder.titleKey), type: 'special' }, 0, folder.count);
         tree.appendChild(itemEl);
     });
 
-    const buildTree = (parentId, level) => {
+    // --- FIX: Logic to build tree based on serverId as parentId ---
+    const buildTree = (parentId, level) => { // parentId is now the serverId (or 'root') of the parent
         const ul = document.createElement('ul');
-        // 使用 clientId 进行父子关系过滤
+        
+        // Find children by comparing their parentId with the parent's serverId.
         const children = allItems.filter(item => item.parentId === parentId && item.type === 'folder');
         children.sort((a,b) => a.title.localeCompare(b.title));
         
         children.forEach(child => {
             const li = document.createElement('li');
-            // 核心修复：使用 child.clientId 来查找子书签数量和构建下一级树
-            const childCount = allItems.filter(i => i.parentId === child.clientId && i.type === 'bookmark').length;
+            
+            // A child's reference ID is its serverId (if synced) or its clientId (if offline).
+            const childReferenceId = child.serverId || child.clientId;
+
+            // Count bookmarks inside this child folder using the child's referenceId.
+            const childCount = allItems.filter(i => i.parentId === childReferenceId && i.type === 'bookmark').length;
+            
             const itemEl = createTreeItem(child, level, childCount);
             li.appendChild(itemEl);
 
             const grandChildrenContainer = document.createElement('div');
             grandChildrenContainer.className = 'tree-item-children';
-            // 核心修复：将 child.clientId 作为下一级的 parentId 传递下去
-            grandChildrenContainer.appendChild(buildTree(child.clientId, level + 1));
+            // Recursion must use the child's referenceId.
+            grandChildrenContainer.appendChild(buildTree(childReferenceId, level + 1));
             li.appendChild(grandChildrenContainer);
             
             ul.appendChild(li);
@@ -296,6 +308,7 @@ function initOptions(i18n, currentLang) {
               itemsToShow = allItems.filter(item => item.type === 'bookmark');
               breadcrumbText = i18n.get('allBookmarks');
           } else {
+              // --- FIX: Filter items where parentId matches the folder's referenceId (which is the folderId). ---
               itemsToShow = allItems.filter(item => item.parentId === folderId && item.type === 'bookmark');
               breadcrumbText = getBreadcrumb(folderId);
           }
@@ -466,9 +479,8 @@ function initOptions(i18n, currentLang) {
   function handleStorageChange(changes) {
     if (changes.bookmarkItems) {
       allItems = changes.bookmarkItems.newValue || [];
-      // 核心修复：使用 clientId 来检查活动文件夹是否存在
-      if (!allItems.some(item => item.clientId === activeFolderId)) {
-          // 如果当前激活的文件夹被删除了，则默认返回到'root'
+      // --- FIX: Check if active folder exists by its referenceId ---
+      if (!allItems.some(item => (item.serverId === activeFolderId || item.clientId === activeFolderId))) {
           if (activeFolderId !== 'root' && activeFolderId !== 'starred') {
              activeFolderId = 'root';
           }
@@ -572,6 +584,43 @@ function initOptions(i18n, currentLang) {
   }
 
   function handleImportBookmarks() {
+    // 立即反馈：禁用按钮，改变文本
+    importBtn.disabled = true;
+    importBtn.textContent = i18n.get('importing') || '导入中...';
+
+    // 初始toast
+    showToast(i18n.get('importStarted'), 2000, '#4285f4');
+
+    // 显示加载遮罩的定时器（如果>2秒未完成）
+    let loadingTimeout = setTimeout(() => {
+      if (loadingOverlay) {
+        loadingOverlay.classList.remove('hidden');
+        if (loadingMessage) loadingMessage.textContent = i18n.get('importInProgress') || '正在导入书签，请稍候...';
+        if (progressMessage) progressMessage.textContent = ''; // 由于进度在background.js，无法实时更新，这里可选显示“处理中...”
+      }
+    }, 1000);
+
+    chrome.runtime.sendMessage({ action: "importBrowserBookmarks" }, response => {
+      // 完成：隐藏加载，恢复按钮
+      clearTimeout(loadingTimeout);
+      if (loadingOverlay) loadingOverlay.classList.add('hidden');
+      importBtn.disabled = false;
+      importBtn.textContent = i18n.get('importBookmarks') || 'Import Bookmarks';
+
+      if (chrome.runtime.lastError || response?.status !== "success") {
+        showToast(i18n.get("importFailed"), 2000, "#ff4444");
+      } else if (response.count > 0) {
+        showToast(i18n.get('importSuccess', {count: response.count}));
+      } else {
+        showToast(i18n.get("importNoNew"));
+      }
+
+      // 刷新UI（假设导入成功后需要）
+      loadAllItems(); // 或 renderFolderTree(); renderBookmarkList(activeFolderId);
+    });
+  }
+/*
+  function handleImportBookmarks() {
     chrome.runtime.sendMessage({ action: "importBrowserBookmarks" }, response => {
       if (chrome.runtime.lastError || response?.status !== "success") {
         showToast(i18n.get("importFailed"), 2000, "#ff4444");
@@ -582,7 +631,7 @@ function initOptions(i18n, currentLang) {
       }
     });
   }
-
+*/
   function handleStarToggle(id, starElement) {
     chrome.runtime.sendMessage({ action: "toggleStar", id: id }, response => {
       if (chrome.runtime.lastError || response?.status !== "success") {
@@ -623,15 +672,15 @@ function initOptions(i18n, currentLang) {
   function handleDeleteFolder() {
     if (!contextMenuFolderId) return;
 
-    // 核心修复：使用 clientId 来查找待删除的文件夹
-    const folderToDelete = allItems.find(item => item.clientId === contextMenuFolderId);
+    // --- FIX: Find folder by referenceId and send its stable clientId for deletion ---
+    const folderToDelete = allItems.find(item => item.serverId === contextMenuFolderId || item.clientId === contextMenuFolderId);
     if (!folderToDelete) return;
     
     const confirmationMessage = i18n.get('confirmDeleteFolder', { folderName: folderToDelete.title });
     
     if (confirm(confirmationMessage)) {
-      // 发送到 background.js 的 ID 已经是 clientId，这部分是正确的
-      chrome.runtime.sendMessage({ action: "deleteBookmark", id: contextMenuFolderId }, response => {
+      // Always send the stable clientId to the background script for deletion logic.
+      chrome.runtime.sendMessage({ action: "deleteBookmark", id: folderToDelete.clientId }, response => {
         if (chrome.runtime.lastError || response?.status !== "success") {
           showToast(i18n.get("operationFailed"), 2000, "#ff4444");
         } else {
@@ -702,13 +751,18 @@ function initOptions(i18n, currentLang) {
   function createTreeItem(item, level, count) {
     const div = document.createElement('div');
     div.className = 'tree-item';
-    div.dataset.id = item.clientId || item.id;
+    
+    // --- FIX: The data-id is now the referenceId (serverId or clientId for offline items) ---
+    // This is the ID used for clicking and identifying the active folder.
+    const referenceId = item.serverId || item.clientId;
+    div.dataset.id = referenceId || item.id; // Fallback to item.id for special folders like 'root', 'starred'
+
     div.dataset.type = item.type;
     div.style.paddingLeft = `${8 + level * 20}px`;
 
     let iconHtml = '';
     if (item.type === 'folder') {
-        const hasChildren = allItems.some(i => i.parentId === item.id && i.type === 'folder');
+        const hasChildren = allItems.some(i => i.parentId === referenceId);
         const toggleIcon = hasChildren ? `<svg class="icon toggle" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" fill="currentColor"></path></svg>` : `<span class="icon toggle" style="width: 24px; display: inline-block;"></span>`;
         iconHtml = `${toggleIcon}<svg class="icon folder" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" fill="currentColor"></path></svg>`;
     } else if (item.type === 'special') {
@@ -833,13 +887,13 @@ function initOptions(i18n, currentLang) {
       return div;
   }
 
-  function getBreadcrumb(folderId) {
+  function getBreadcrumb(folderId) { // folderId is a referenceId (serverId or clientId)
       if (folderId === 'root') return i18n.get('allBookmarks');
       let path = [];
       let currentId = folderId;
       while (currentId && currentId !== 'root') {
-          // 核心修复：使用 clientId 来查找文件夹
-          const folder = allItems.find(item => item.clientId === currentId);
+          // --- FIX: Find the folder by checking if the currentId matches either serverId or clientId. ---
+          const folder = allItems.find(item => item.serverId === currentId || item.clientId === currentId);
           if (folder) {
               path.unshift(folder.title);
               currentId = folder.parentId;

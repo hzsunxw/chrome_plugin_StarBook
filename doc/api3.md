@@ -29,6 +29,7 @@
   "title": "一篇关于API设计的文章",
   "summary": "这是由AI生成的书签摘要...",
   "tags": ["技术", "API设计", "后端"],
+  "aiStatus": "pending",
   "notes": "这篇文章非常值得一读。",
   "contentType": "article",
   "estimatedReadTime": 10,
