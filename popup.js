@@ -185,7 +185,7 @@ function initPopup(i18n) {
           const displayTags = bookmark.tags.slice(0, 3);
           html += `<div class="bookmark-tags-popup">
             ${displayTags.map(tag => `<span class="tag-popup" data-tag="${tag}">${tag}</span>`).join('')}
-            ${bookmark.tags.length > 3 ? `<span class="tag-more">+${bookmark.tags.length - 3}</span>` : ''}
+            ${bookmark.tags.length > 3 ? `<span class="tag-more">${i18n.get('moreTags', { count: bookmark.tags.length - 3 })}</span>` : ''}
           </div>`;
         }
         

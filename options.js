@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Display an error message to the user on the page itself
     const i18nError = new I18nManager();
     await i18nError.loadMessages('en'); // Fallback to english for error message
-    document.body.innerHTML = `<div style="padding: 20px; text-align: center; color: red;">${i18nError.get('initializationError')}</div>`;
+    document.body.innerHTML = `<div style="padding: 20px; text-align: center; color: red;">${i18n.get('initializationError')}</div>`;
   }
 });
 
@@ -438,7 +438,7 @@ function initOptions(i18n, currentLang) {
               // Also find the bookmark by its `clientId` here.
               const bookmark = allItems.find(b => b.clientId === id);
               if (bookmark) {
-                  showToast("正在打开学习助手...", 2000);
+                  showToast(i18n.get('openingLearningAssistant'), 2000);
                   chrome.runtime.sendMessage({ action: "openLearningAssistant", bookmark: bookmark });
               }
           }
@@ -509,9 +509,12 @@ function initOptions(i18n, currentLang) {
     document.getElementById('openrouterConfig').style.display = provider === 'openrouter' ? 'block' : 'none';
   }
   
-  function saveAIConfig() {
+  async function saveAIConfig() {
     const provider = document.getElementById('aiProvider').value;
-    let config = { provider };
+    let config = {
+      provider,
+      lastModified: new Date().toISOString() // 添加时间戳
+    };
 
     if (provider === 'openai') {
         config.apiKey = document.getElementById('openaiKey').value;
@@ -526,43 +529,242 @@ function initOptions(i18n, currentLang) {
 
     const analysisDepth = document.getElementById('aiAnalysisDepth').value;
 
-    chrome.storage.local.set({
-      aiConfig: config,
-      aiAnalysisDepth: analysisDepth
-    }, () => {
-      if (chrome.runtime.lastError) {
-        console.error("Error saving config:", chrome.runtime.lastError);
-        showToast(i18n.get("operationFailed"), 3000, "#ea4335");
-      } else {
-        showToast(i18n.get('configSaved'));
-      }
-    });
+    try {
+      // 1. 保存到本地
+      await new Promise((resolve, reject) => {
+        chrome.storage.local.set({
+          aiConfig: config,
+          aiAnalysisDepth: analysisDepth
+        }, () => {
+          if (chrome.runtime.lastError) {
+            reject(chrome.runtime.lastError);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // 2. 同步到服务器（如果用户已登录）
+      await syncAIConfigToServer(config, analysisDepth);
+
+      showToast(i18n.get('configSaved'));
+    } catch (error) {
+      console.error("Error saving config:", error);
+      showToast(i18n.get("operationFailed"), 3000, "#ea4335");
+    }
   }
 
   function loadAIConfig() {
+    // 只负责从本地存储加载配置到UI，不进行服务器同步
+    // 服务器同步由登录后的 background.js 中的 syncAIConfigAfterLogin() 处理
     chrome.storage.local.get(['aiConfig', 'aiAnalysisDepth'], (data) => {
       const config = data.aiConfig || {};
       if (config.provider) {
         aiProvider.value = config.provider;
       }
-      
+
       const analysisDepth = data.aiAnalysisDepth || 'standard';
       const depthSelector = document.getElementById('aiAnalysisDepth');
       if (depthSelector) {
         depthSelector.value = analysisDepth;
       }
-      
+
       document.getElementById('openaiKey').value = config.provider === 'openai' ? config.apiKey || '' : '';
       document.getElementById('openaiModel').value = config.provider === 'openai' ? config.model || 'gpt-4o' : 'gpt-4o';
-      
+
       document.getElementById('deepseekKey').value = config.provider === 'deepseek' ? config.apiKey || '' : '';
       document.getElementById('deepseekModel').value = config.provider === 'deepseek' ? config.model || 'deepseek-chat' : 'deepseek-chat';
-      
+
       document.getElementById('openrouterKey').value = config.provider === 'openrouter' ? config.apiKey || '' : '';
       document.getElementById('openrouterModel').value = config.provider === 'openrouter' ? config.model || '' : '';
-      
+
       handleProviderChange();
     });
+  }
+
+  // AI配置同步相关函数
+
+
+
+  /**
+   * 将本地AI配置同步到服务器
+   * 使用新的RESTful API设计：POST创建/替换，PUT部分更新
+   */
+  async function syncAIConfigToServer(config, analysisDepth) {
+    try {
+      // 检查用户是否已登录
+      const authData = await new Promise(resolve => {
+        chrome.storage.local.get('authData', (data) => resolve(data.authData));
+      });
+
+      if (!authData || !authData.token) {
+        console.log('用户未登录，跳过AI配置同步到服务器');
+        return;
+      }
+
+      // 准备配置数据（符合新API格式）
+      const configPayload = {
+        provider: config.provider,
+        apiKey: config.apiKey,
+        model: config.model
+        // 注意：analysisDepth不在标准AI配置中，可能需要单独处理
+      };
+
+      // 首先尝试获取现有配置，判断是创建还是更新
+      let method = 'POST'; // 默认创建/替换
+      let url = 'https://bookmarker-api.aiwetalk.com/api/user/settings/ai-config';
+
+      try {
+        const existingResponse = await fetch(url, {
+          headers: { 'Authorization': `${authData.token}` }
+        });
+
+        if (existingResponse.ok) {
+          // 配置已存在，使用PUT进行部分更新
+          method = 'PUT';
+          console.log('AI配置已存在，使用PUT更新');
+        } else if (existingResponse.status === 404) {
+          // 配置不存在，使用POST创建
+          method = 'POST';
+          console.log('AI配置不存在，使用POST创建');
+        }
+      } catch (checkError) {
+        console.warn('检查现有配置失败，默认使用POST:', checkError);
+      }
+
+      // 执行同步操作
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `${authData.token}`
+        },
+        body: JSON.stringify(configPayload)
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(`同步到服务器失败: ${response.status} - ${errorBody.error || response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('AI配置已同步到服务器:', result);
+
+    } catch (error) {
+      console.error('同步AI配置到服务器失败:', error);
+      // 不抛出错误，允许本地保存成功
+    }
+  }
+
+  /**
+   * AI配置冲突解决：基于时间戳比较
+   * @param {Object} localConfig 本地配置
+   * @param {Object} serverConfig 服务器配置
+   * @returns {boolean} true表示应该使用服务器配置，false表示使用本地配置
+   */
+  function resolveAIConfigConflict(localConfig, serverConfig) {
+    const localTime = new Date(localConfig.lastModified || 0);
+    const serverTime = new Date(serverConfig.lastModified || 0);
+
+    console.log('AI配置时间戳比较:', {
+      local: localConfig.lastModified,
+      server: serverConfig.lastModified,
+      localTime: localTime.getTime(),
+      serverTime: serverTime.getTime(),
+      useServer: serverTime > localTime
+    });
+
+    // 返回true表示服务器配置更新，应该使用服务器配置
+    return serverTime > localTime;
+  }
+
+  /**
+   * 删除服务器上的AI配置
+   */
+  async function deleteAIConfigFromServer() {
+    try {
+      // 检查用户是否已登录
+      const authData = await new Promise(resolve => {
+        chrome.storage.local.get('authData', (data) => resolve(data.authData));
+      });
+
+      if (!authData || !authData.token) {
+        console.log('用户未登录，无法删除服务器AI配置');
+        return false;
+      }
+
+      const response = await fetch('https://bookmarker-api.aiwetalk.com/api/user/settings/ai-config', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `${authData.token}`
+        }
+      });
+
+      if (response.status === 404) {
+        console.log('服务器上无AI配置可删除');
+        return true; // 视为成功，因为目标已达成
+      }
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(`删除服务器配置失败: ${response.status} - ${errorBody.error || response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('服务器AI配置已删除:', result);
+      return true;
+
+    } catch (error) {
+      console.error('删除服务器AI配置失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 清除所有AI配置（本地和服务器）
+   */
+  async function clearAllAIConfig() {
+    if (!confirm(i18n.get('confirmClearAIConfig'))) {
+      return;
+    }
+
+    try {
+      // 1. 删除服务器配置
+      const serverDeleted = await deleteAIConfigFromServer();
+
+      // 2. 删除本地配置
+      await new Promise((resolve, reject) => {
+        chrome.storage.local.remove(['aiConfig', 'aiAnalysisDepth'], () => {
+          if (chrome.runtime.lastError) {
+            reject(chrome.runtime.lastError);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // 3. 清空UI
+      document.getElementById('aiProvider').value = '';
+      document.getElementById('openaiKey').value = '';
+      document.getElementById('openaiModel').value = 'gpt-4o';
+      document.getElementById('deepseekKey').value = '';
+      document.getElementById('deepseekModel').value = 'deepseek-chat';
+      document.getElementById('openrouterKey').value = '';
+      document.getElementById('openrouterModel').value = '';
+      document.getElementById('aiAnalysisDepth').value = 'standard';
+
+      handleProviderChange();
+
+      if (serverDeleted) {
+        showToast(i18n.get('aiConfigCleared'));
+      } else {
+        showToast(i18n.get('aiConfigClearedLocalOnly'), 3000, '#ff9800');
+      }
+
+    } catch (error) {
+      console.error('清除AI配置失败:', error);
+      showToast(i18n.get('aiConfigClearFailed', { error: error.message }), 3000, '#f44336');
+    }
   }
 
 /**
@@ -570,14 +772,14 @@ function initOptions(i18n, currentLang) {
    * Sends a message to the background script to force restart the AI task queue.
    */
   function handleRestartAiTasks() {
-    if (confirm("确定要强制重启AI分析任务吗？\n这将清空现有队列，并重新检查所有书签，为处理中、失败或内容不完整的书签重新创建任务。")) {
-      showToast("正在发送重启指令...", 2000, "#1976d2");
+    if (confirm(i18n.get('confirmRestartAiTasks'))) {
+      showToast(i18n.get('restartingAiTasks'), 2000, "#1976d2");
       
       chrome.runtime.sendMessage({ action: "forceRestartAiQueue" }, (response) => {
         if (response && response.status === 'success') {
-          showToast(`已成功重新创建 ${response.restartedCount} 个AI分析任务。`, 4000, '#4CAF50');
+          showToast(i18n.get('restartAiTasksSuccess', { count: response.restartedCount }), 4000, '#4CAF50');
         } else {
-          showToast(`操作失败: ${response?.message || '未知错误'}`, 3000, "#ea4335");
+          showToast(i18n.get('restartAiTasksFailed', { message: response?.message || 'Unknown error' }), 3000, "#ea4335");
         }
       });
     }
@@ -586,7 +788,7 @@ function initOptions(i18n, currentLang) {
   function handleImportBookmarks() {
     // 立即反馈：禁用按钮，改变文本
     importBtn.disabled = true;
-    importBtn.textContent = i18n.get('importing') || '导入中...';
+    importBtn.textContent = i18n.get('importing');
 
     // 初始toast
     showToast(i18n.get('importStarted'), 2000, '#4285f4');
@@ -595,7 +797,7 @@ function initOptions(i18n, currentLang) {
     let loadingTimeout = setTimeout(() => {
       if (loadingOverlay) {
         loadingOverlay.classList.remove('hidden');
-        if (loadingMessage) loadingMessage.textContent = i18n.get('importInProgress') || '正在导入书签，请稍候...';
+        if (loadingMessage) loadingMessage.textContent = i18n.get('importingBookmarks');
         if (progressMessage) progressMessage.textContent = ''; // 由于进度在background.js，无法实时更新，这里可选显示“处理中...”
       }
     }, 1000);
@@ -983,72 +1185,27 @@ function initOptions(i18n, currentLang) {
   }
 
   function getQAPrompt(question, bookmarks, categories, tags, relatedBookmarks, lang) {
-      const currentLangKey = lang.startsWith('zh') ? 'zh_CN' : 'en';
-      
-      const prompts = {
-        en: {
-          system: "You are an intelligent assistant. Answer questions based on the user's bookmark preferences and recommend websites.",
-          question: "Question",
-          overview: "User's Bookmarks Overview",
-          total: "Total bookmarks",
-          sites: "sites",
-          main_cat: "Main categories",
-          common_tags: "Common tags",
-          related: "User's Existing Related Bookmarks",
-          unclassified: "Unclassified",
-          format_instructions: "Response Format (must return complete JSON, not truncated):",
-          format_json: `{"answer":"Brief answer","recommendations":[{"title":"Site Name","url":"Full URL","description":"Brief description","category":"Category","tags":["tag1","tag2"],"why":"Brief reason"}],"existingBookmarks":[],"tips":["Tip 1","Tip 2"]}`,
-          strict_req: "Strict Requirements",
-          req1: "1. Must return complete JSON, ensuring it ends with }",
-          req2: "2. Return ONLY the JSON, no other text or markdown.",
-          req3: "3. Recommend 3 real websites, each description no more than 25 words.",
-          req4: "4. URL must be complete and accessible.",
-          req5: "5. If content is too long, prioritize JSON completeness."
-        },
-        zh_CN: {
-          system: "你是智能助手，基于用户的收藏偏好回答问题并推荐网站。",
-          question: "问题",
-          overview: "用户收藏概况",
-          total: "总收藏数",
-          sites: "个网站",
-          main_cat: "主要分类",
-          common_tags: "常用标签",
-          related: "用户现有相关收藏",
-          unclassified: "未分类",
-          format_instructions: "返回格式（必须返回完整的JSON，不能截断）：",
-          format_json: `{"answer":"简短回答","recommendations":[{"title":"网站名","url":"完整URL","description":"简短描述","category":"分类","tags":["标签1","标签2"],"why":"简短理由"}],"existingBookmarks":[],"tips":["建议1","建议2"]}`,
-          strict_req: "严格要求",
-          req1: "1. 必须返回完整的JSON，确保以}结尾",
-          req2: "2. 只返回JSON，不要任何其他文字或markdown",
-          req3: "3. 推荐3个真实网站，每个描述不超过25字",
-          req4: "4. URL必须完整可访问",
-          req5: "5. 如果内容太长，优先保证JSON完整性"
-        }
-      };
+      return `${i18n.get('qaPromptSystem')}
 
-      const p = prompts[currentLangKey];
+    ${i18n.get('qaPromptQuestion')}：${question}
 
-      return `${p.system}
+    ${i18n.get('qaPromptOverview')}：
+    - ${i18n.get('qaPromptTotal')}：${bookmarks.length}${i18n.get('qaPromptSites')}
+    - ${i18n.get('qaPromptMainCat')}：${categories.slice(0, 5).join(', ')}
+    - ${i18n.get('qaPromptCommonTags')}：${tags.slice(0, 10).join(', ')}
 
-    ${p.question}：${question}
+    ${i18n.get('qaPromptRelated')}：
+    ${relatedBookmarks.map(b => `- ${b.title} (${b.category || i18n.get('qaPromptUnclassified')})`).join('\n')}
 
-    ${p.overview}：
-    - ${p.total}：${bookmarks.length}${p.sites}
-    - ${p.main_cat}：${categories.slice(0, 5).join(', ')}
-    - ${p.common_tags}：${tags.slice(0, 10).join(', ')}
+    ${i18n.get('qaPromptFormatInstructions')}
+    ${i18n.get('qaPromptFormatJson')}
 
-    ${p.related}：
-    ${relatedBookmarks.map(b => `- ${b.title} (${b.category || p.unclassified})`).join('\n')}
-
-    ${p.format_instructions}
-    ${p.format_json}
-
-    ${p.strict_req}：
-    ${p.req1}
-    ${p.req2}
-    ${p.req3}
-    ${p.req4}
-    ${p.req5}`;
+    ${i18n.get('qaPromptStrictReq')}：
+    ${i18n.get('qaPromptReq1')}
+    ${i18n.get('qaPromptReq2')}
+    ${i18n.get('qaPromptReq3')}
+    ${i18n.get('qaPromptReq4')}
+    ${i18n.get('qaPromptReq5')}`;
   }
 
 
@@ -1164,7 +1321,7 @@ function initOptions(i18n, currentLang) {
           };
         }
       } else {
-        throw new Error('AI API call failed');
+        throw new Error(i18n.get('operationFailed'));
       }
 
     } catch (error) {
@@ -1436,7 +1593,7 @@ function initOptions(i18n, currentLang) {
       } else if (response && response.status === "exists") {
         showToast(i18n.get('alreadyExistsToast'), 2000, "#ffc107");
       } else {
-        showToast(i18n.get('addFailedToast', { message: response?.message || "Unknown error" }), 3000, "#dc3545");
+        showToast(i18n.get('addFailedToast', { message: response?.message || i18n.get('operationFailed') }), 3000, "#dc3545");
       }
     } catch (error) {
       showToast(i18n.get('addFailedToast', { message: error.message }), 3000, "#dc3545");

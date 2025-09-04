@@ -391,5 +391,251 @@
   "learningAssistant": {
     "message": "Learning Assistant",
     "description": "Tooltip for the Learning Assistant button."
+  },
+  "restartAiTasks": {
+    "message": "Restart AI Analysis",
+    "description": "Button to restart all pending or failed AI tasks."
+  },
+  "restartAiTasksTooltip": {
+    "message": "Force re-analysis of all processing or failed bookmarks.",
+    "description": "Tooltip for the Restart AI Analysis button."
+  },
+  "loginOrRegister": {
+    "message": "Login / Register",
+    "description": "Button text for user login or registration."
+  },
+  "logout": {
+    "message": "Logout",
+    "description": "Button text for user logout."
+  },
+  "clearConfig": {
+    "message": "Clear Configuration",
+    "description": "Button to clear all saved AI configurations."
+  },
+  "authenticatedUser": {
+    "message": "Authenticated User"
+  },
+  "userIdDisplay": {
+    "message": "User ID: ${userId}..."
+  },
+  "loginModalTitle": {
+    "message": "Login or Register",
+    "description": "Title for the login modal."
+  },
+  "emailPlaceholder": {
+    "message": "Please enter your email",
+    "description": "Placeholder for the email input field."
+  },
+  "passwordPlaceholder": {
+    "message": "Please enter your password",
+    "description": "Placeholder for the password input field."
+  },
+  "orDivider": {
+    "message": "or",
+    "description": "Divider text, e.g., 'or' between login options."
+  },
+  "loginWithGoogle": {
+    "message": "Login with Google",
+    "description": "Button text for Google social login."
+  },
+  "loginWithGithub": {
+    "message": "Login with GitHub",
+    "description": "Button text for GitHub social login."
+  },
+  "importingBookmarks": {
+    "message": "Importing bookmarks, please wait...",
+    "description": "Loading message shown during bookmark import."
+  },
+  "langEnglish": {
+    "message": "English",
+    "description": "Language option for English."
+  },
+  "langChinese": {
+    "message": "简体中文",
+    "description": "Language option for Simplified Chinese."
+  },
+  "moreTags": {
+    "message": "+${count} more",
+    "description": "Indicator for more tags not shown in the list, e.g., '+3 more'."
+  },
+  "initializationError": {
+    "message": "Failed to initialize the extension. Please try reloading.",
+    "description": "Error message shown on the options page if initialization fails."
+  },
+  "confirmClearAIConfig": {
+    "message": "Are you sure you want to clear all AI configurations? This will delete the configuration on both local and server.",
+    "description": "Confirmation message before clearing all AI settings."
+  },
+  "aiConfigCleared": {
+    "message": "AI configuration has been completely cleared (local and server).",
+    "description": "Success toast when AI config is cleared everywhere."
+  },
+  "aiConfigClearedLocalOnly": {
+    "message": "Local AI configuration cleared, but failed to delete server configuration.",
+    "description": "Warning toast when only local AI config could be cleared."
+  },
+  "aiConfigClearFailed": {
+    "message": "Failed to clear AI configuration: ${error}",
+    "description": "Error toast when clearing AI config fails."
+  },
+  "confirmRestartAiTasks": {
+    "message": "Are you sure you want to force restart AI analysis tasks?\nThis will clear the existing queue and re-check all bookmarks to re-create tasks for processing, failed, or incomplete items.",
+    "description": "Confirmation message before restarting the AI queue."
+  },
+  "restartingAiTasks": {
+    "message": "Sending restart command...",
+    "description": "Toast message indicating the AI restart command has been sent."
+  },
+  "restartAiTasksSuccess": {
+    "message": "Successfully re-created ${count} AI analysis tasks.",
+    "description": "Success toast after AI tasks have been restarted."
+  },
+  "restartAiTasksFailed": {
+    "message": "Operation failed: ${message}",
+    "description": "Error toast when restarting AI tasks fails."
+  },
+  "importing": {
+    "message": "Importing...",
+    "description": "Button text shown during an import process."
+  },
+  "importStarted": {
+    "message": "Import process started...",
+    "description": "Toast message when the bookmark import begins."
+  },
+  "qaMustEnterQuestion": {
+    "message": "Please enter a question to ask.",
+    "description": "Alert message if the user tries to ask an empty question."
+  },
+  "qaSearchError": {
+    "message": "An error occurred during the search.",
+    "description": "Alert message if the Q&A search fails."
+  },
+  "qaJsonParseError": {
+    "message": "Failed to parse the AI's response. The format might be incorrect.",
+    "description": "Error message when the AI response is not valid JSON."
+  },
+  "qaTipRetry": {
+    "message": "Try asking in a different way.",
+    "description": "A helpful tip for the user in the Q&A section."
+  },
+  "qaTipCheckConfig": {
+    "message": "Check your AI configuration and API key.",
+    "description": "A helpful tip for the user in the Q&A section."
+  },
+  "qaAiSearchError": {
+    "message": "AI search failed: ${message}",
+    "description": "Error message when the AI-powered search fails."
+  },
+  "qaSearchGoogle": {
+    "message": "Search on Google for an answer.",
+    "description": "Fallback recommendation to search on Google."
+  },
+  "qaSearchBaidu": {
+    "message": "Search on Baidu for an answer.",
+    "description": "Fallback recommendation to search on Baidu."
+  },
+  "qaTipCheckNetwork": {
+    "message": "Check your network connection.",
+    "description": "A helpful tip for the user in the Q&A section."
+  },
+  "qaTruncatedError": {
+    "message": "AI response seems to be truncated.",
+    "description": "Error message when the AI response is incomplete."
+  },
+  "qaTipRetryComplete": {
+    "message": "Please try again to get a complete response.",
+    "description": "A helpful tip for the user in the Q&A section."
+  },
+  "qaNoResults": {
+    "message": "No relevant bookmarks found for your question: ${question}",
+    "description": "Message shown when Q&A search yields no results."
+  },
+  "qaSuggestions": {
+    "message": "Suggestions",
+    "description": "Header for a list of suggestions."
+  },
+  "qaSuggestion1": {
+    "message": "Try using different keywords.",
+    "description": "A suggestion for the user."
+  },
+  "qaSuggestion2": {
+    "message": "Make sure your bookmarks have been analyzed by AI.",
+    "description": "A suggestion for the user."
+  },
+  "qaSuggestion3": {
+    "message": "Ask a more general question.",
+    "description": "A suggestion for the user."
+  },
+  "qaResultsFound": {
+    "message": "${count} relevant results found.",
+    "description": "Header indicating the number of search results."
+  },
+  "relevance": {
+    "message": "Relevance",
+    "description": "Label for the relevance score."
+  },
+  "viewDetails": {
+    "message": "View Details",
+    "description": "Button text to view more details."
+  },
+  "addedToBookmarksToast": {
+    "message": "Added '${title}' to your bookmarks.",
+    "description": "Success toast when a recommended site is bookmarked."
+  },
+  "alreadyExistsToast": {
+    "message": "This page is already in your bookmarks.",
+    "description": "Toast message when trying to add a duplicate bookmark from recommendations."
+  },
+  "addFailedToast": {
+    "message": "Failed to add bookmark: ${message}",
+    "description": "Error toast when adding a recommended site fails."
+  },
+  "qaReasonRelated": {
+    "message": "Found in your existing bookmarks.",
+    "description": "Reason given for a bookmark that is already in the user's collection."
+  },
+  "openingLearningAssistant": {
+    "message": "Opening Learning Assistant...",
+    "description": "Toast message shown when opening the learning assistant."
+  },
+  "qaPromptSystem": { "message": "You are an intelligent assistant. Answer questions based on the user's bookmark preferences and recommend websites." },
+  "qaPromptQuestion": { "message": "Question" },
+  "qaPromptOverview": { "message": "User's Bookmarks Overview" },
+  "qaPromptTotal": { "message": "Total bookmarks" },
+  "qaPromptSites": { "message": "sites" },
+  "qaPromptMainCat": { "message": "Main categories" },
+  "qaPromptCommonTags": { "message": "Common tags" },
+  "qaPromptRelated": { "message": "User's Existing Related Bookmarks" },
+  "qaPromptUnclassified": { "message": "Unclassified" },
+  "qaPromptFormatInstructions": { "message": "Response Format (must return complete JSON, not truncated):" },
+  "qaPromptFormatJson": { "message": "{\"answer\":\"Brief answer\",\"recommendations\":[{\"title\":\"Site Name\",\"url\":\"Full URL\",\"description\":\"Brief description\",\"category\":\"Category\",\"tags\":[\"tag1\",\"tag2\"],\"why\":\"Brief reason\"}],\"existingBookmarks\":[],\"tips\":[\"Tip 1\",\"Tip 2\"]}" },
+  "qaPromptStrictReq": { "message": "Strict Requirements" },
+  "qaPromptReq1": { "message": "1. Must return complete JSON, ensuring it ends with }" },
+  "qaPromptReq2": { "message": "2. Return ONLY the JSON, no other text or markdown." },
+  "qaPromptReq3": { "message": "3. Recommend 3 real websites, each description no more than 25 words." },
+  "qaPromptReq4": { "message": "4. URL must be complete and accessible." },
+  "qaPromptReq5": { "message": "5. If content is too long, prioritize JSON completeness." },
+  "learningAssistantTitle": {
+    "message": "🎓 Learning Assistant",
+    "description": "Title for the Learning Assistant side panel."
+  },
+  "assistantPlaceholder": {
+    "message": "Please open the learning assistant from the bookmark list on the options page.",
+    "description": "Placeholder text in the side panel when no bookmark is active."
+  },
+  "prompt_ask_about_bookmark_in_tab": {
+    "message": "You are a rigorous AI Q&A assistant. Please answer the user's question strictly based on the \"Context\" provided below.\n\n### Context:\n$pageContent$\n\n### User's Question:\n$question$\n\n### Your Requirements:\n- Your answer must be based entirely on the \"Context\" above.\n- If the \"Context\" does not contain enough information to answer the question, please state clearly: \"Based on the provided article content, this question cannot be answered.\"\n- The answer should be direct and concise.",
+    "description": "Prompt for asking questions about a bookmark's content.",
+    "placeholders": {
+      "pageContent": { "content": "$1" },
+      "question": { "content": "$2" }
+    }
+  },
+  "prompt_generate_quiz_in_tab": {
+    "message": "You are an excellent learning tutor. Please read the following \"Text Content\" carefully, extract 3 to 5 of the most important key knowledge points, and design a learning quiz.\n\n### Text Content:\n$pageContent$\n\n### Your Task:\n1. Create 3-5 questions, which can be multiple-choice or short-answer.\n2. Ensure the questions effectively test understanding of the text's core content.\n3. Return a JSON object containing a \"quiz\" list. Each question object should include \"question\" (question), \"type\" ('multiple-choice' or 'short-answer'), \"options\" (array of options for multiple-choice, empty for short-answer), and \"answer\" (answer).\n\n### JSON Format Example:\n{\"quiz\": [{\"question\": \"What is the main purpose of React Hooks?\",\"type\": \"multiple-choice\",\"options\": [\"A. To style components\",\"B. To use state and other React features in functional components\",\"C. For routing management\"],\"answer\": \"B. To use state and other React features in functional components\"}]}\n\n### Critical Instruction:\nYour response must be and only be a single, complete, syntactically correct JSON object. Do not add any extra text, explanations, or comments before or after the JSON code block. If you cannot generate a meaningful quiz from the content, you must return a JSON object with an empty list: {\"quiz\": []}",
+    "description": "Prompt for generating a quiz from a bookmark's content.",
+    "placeholders": {
+      "pageContent": { "content": "$1" }
+    }
   }
 }

@@ -1,6 +1,13 @@
 // sidepanel.js
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    const i18n = new I18nManager();
+    const { language: storedLang } = await chrome.storage.local.get('language');
+    const lang = storedLang || (chrome.i18n.getUILanguage().startsWith('zh') ? 'zh_CN' : 'en');
+    
+    await i18n.loadMessages(lang);
+    i18n.applyToDOM();
+
     const askBtn = document.getElementById('la-ask-btn');
     const quizBtn = document.getElementById('la-quiz-btn');
     const qaInput = document.getElementById('la-qa-input');
@@ -28,10 +35,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const handleAsk = () => {
         const question = qaInput.value;
         if (!question.trim() || !currentBookmarkId) return;
-        qaAnswerDiv.innerHTML = '<p>🤖 正在分析文章并思考答案...</p>';
+        qaAnswerDiv.innerHTML = `<p>${i18n.get('analyzingAndThinking')}</p>`;
         chrome.runtime.sendMessage({ action: "askAboutBookmarkInTab", bookmarkId: currentBookmarkId, question: question }, response => {
             if (chrome.runtime.lastError || response.error) {
-                qaAnswerDiv.innerHTML = `<p style="color: red;">错误: ${response?.error || chrome.runtime.lastError.message}</p>`;
+                qaAnswerDiv.innerHTML = `<p style="color: red;">${i18n.get('errorPrefix')}: ${response?.error || chrome.runtime.lastError.message}</p>`;
             } else {
                 const p = document.createElement('p');
                 p.innerText = response.answer;
@@ -43,15 +50,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const handleQuiz = () => {
         if (!currentBookmarkId) return;
-        quizContentDiv.innerHTML = '<p>🤖 正在阅读文章并为您出题...</p>';
+        quizContentDiv.innerHTML = `<p>${i18n.get('readingAndQuizzing')}</p>`;
         chrome.runtime.sendMessage({ action: "generateQuizInTab", bookmarkId: currentBookmarkId }, response => {
             if (chrome.runtime.lastError || response.error) {
-                quizContentDiv.innerHTML = `<p style="color: red;">错误: ${response?.error || chrome.runtime.lastError.message}</p>`;
+                quizContentDiv.innerHTML = `<p style="color: red;">${i18n.get('errorPrefix')}: ${response?.error || chrome.runtime.lastError.message}</p>`;
             } else {
                 let quizHTML = '<ol>';
                 response.quiz.forEach(q => {
                     let optionsHTML = q.options && q.options.length > 0 ? `<ul>${q.options.map(opt => `<li>${opt}</li>`).join('')}</ul>` : '';
-                    quizHTML += `<li><p><strong>${q.question}</strong></p>${optionsHTML}<details><summary>查看答案</summary><p>${q.answer}</p></details></li>`;
+                    quizHTML += `<li><p><strong>${q.question}</strong></p>${optionsHTML}<details><summary>${i18n.get('viewAnswer')}</summary><p>${q.answer}</p></details></li>`;
                 });
                 quizContentDiv.innerHTML = quizHTML + '</ol>';
             }

@@ -93,6 +93,18 @@ async function handleMessages(request, sender, sendResponse) {
         const { action, id, data } = request;
 
         switch (action) {
+            case 'getI18nMessages': {
+                const { lang } = request;
+                const url = chrome.runtime.getURL(`_locales/${lang}/messages.json`);
+                fetch(url)
+                    .then(response => response.json())
+                    .then(messages => sendResponse({ messages }))
+                    .catch(error => {
+                        console.error(`Failed to fetch messages for lang: ${lang}`, error);
+                        sendResponse({ messages: {} });
+                    });
+                return true; // Indicates async response
+            }
             case 'openLearningAssistant': {
                 const { bookmark } = request;
                 if (!bookmark || !bookmark.url) {
@@ -152,8 +164,7 @@ async function handleMessages(request, sender, sendResponse) {
                     return;
                 }
 
-//                const prompt = `You are a rigorous AI Q&A assistant. Please answer the user's question strictly based on the "Context" provided below.\n\n### Context:\n${pageContent.substring(0, 8000)}\n\n### User's Question:\n${question}\n\n### Your Requirements:\n- Your answer must be based entirely on the "Context" above.\n- If the "Context" does not contain enough information to answer the question, please state clearly: "Based on the provided article content, this question cannot be answered."\n- The answer should be direct and concise.`;
-                const prompt = `你是一个严谨的AI问答助手。请严格根据下面提供的“上下文”来回答用户的问题。\n\n### 上下文:\n${pageContent.substring(0, 8000)}\n\n### 用户的问题:\n${question}\n\n### 你的要求:\n- 你的回答必须完全基于上述“上下文”。\n- 如果“上下文”中没有足够信息来回答问题，请明确指出：“根据所提供的文章内容，无法回答这个问题。”\n- 回答应直接、简洁。`;
+                const prompt = chrome.i18n.getMessage('prompt_ask_about_bookmark_in_tab', [pageContent.substring(0, 8000), question]);
 
                 const answer = await callAI(aiConfig, prompt);
 
@@ -189,8 +200,7 @@ async function handleMessages(request, sender, sendResponse) {
                     return;
                 }
 
-//                const prompt = `You are an excellent learning tutor. Please read the following "Text Content" carefully, extract 3 to 5 of the most important key knowledge points, and design a learning quiz.\n\n### Text Content:\n${pageContent.substring(0, 8000)}\n\n### Your Task:\n1. Create 3-5 questions, which can be multiple-choice or short-answer.\n2. Ensure the questions effectively test understanding of the text's core content.\n3. Return a JSON object containing a "quiz" list. Each question object should include "question", "type" ('multiple-choice' or 'short-answer'), "options" (array of options for multiple-choice, empty for short-answer), and "answer".\n\n### JSON Format Example:\n{"quiz": [{"question": "What is the main purpose of React Hooks?","type": "multiple-choice","options": ["A. To style components","B. To use state and other React features in functional components","C. For routing management"],"answer": "B. To use state and other React features in functional components"}]}\n\n### Critical Instruction:\nYour response must be and only be a single, complete, syntactically correct JSON object. Do not add any extra text, explanations, or comments before or after the JSON code block. If you cannot generate a meaningful quiz from the content, you must return a JSON object with an empty list: {"quiz": []}`;
-                const prompt = `你是一个优秀的学习导师。请仔细阅读以下“文本内容”，并从中提炼出3到5个最重要的核心知识点，设计成一个学习测验。\n\n### 文本内容:\n${pageContent.substring(0, 8000)}\n\n### 你的任务:\n1. 创建3-5个问题，可以是选择题或简答题。\n2. 确保问题能有效检验对文本核心内容的理解。\n3. 返回一个包含 "quiz" 列表的JSON对象。每个问题对象应包含 "question" (问题), "type" (类型: '选择题' 或 '简答题'), "options" (选择题选项数组，简答题则为空数组), 和 "answer" (答案)。\n\n### JSON格式示例:\n{"quiz": [{"question": "React Hooks 的主要目的是什么？","type": "选择题","options": ["A. 样式化组件","B. 在函数组件中使用 state 和其他 React 特性","C. 路由管理"],"answer": "B. 在函数组件中使用 state 和其他 React 特性"}]}\n\n### 关键指令:\n你的回答必须是且仅是一个完整的、语法正确的JSON对象。不要在JSON代码块前后添加任何额外的文字、解释或注释。如果无法根据内容生成有意义的测验，请必须返回一个包含空列表的JSON对象：{"quiz": []}`;
+                const prompt = chrome.i18n.getMessage('prompt_generate_quiz_in_tab', [pageContent.substring(0, 8000)]);
 
                 try {
                     const quizDataStr = await callAI(aiConfig, prompt);
@@ -930,15 +940,204 @@ async function initiateMergeSync() {
 
         // d. 将完全统一和清理后的数据保存到本地存储
         await chrome.storage.local.set({ bookmarkItems: finalItemsToStore });
-        
+
+        // --- 6. 同步AI配置 ---
+        try {
+            console.log("开始同步AI配置...");
+            await syncAIConfigAfterLogin();
+            console.log("AI配置同步完成");
+        } catch (aiSyncError) {
+            console.warn("AI配置同步失败，但不影响书签同步:", aiSyncError);
+        }
+
         console.log(`Merge sync complete. Local store updated with ${finalItemsToStore.length} items.`);
         return { status: "success", count: finalItemsToStore.length };
 
     } catch (e) {
-        // --- 6. 错误处理 ---
+        // --- 7. 错误处理 ---
         console.error("An error occurred during the robust merge sync process:", e);
         // 返回一个包含错误信息的对象，以便调用方可以处理
         return { status: "error", message: e.message };
+    }
+}
+
+/**
+ * 登录后同步AI配置
+ * 从服务器获取AI配置并与本地配置进行时间戳比较
+ */
+async function syncAIConfigAfterLogin() {
+    const token = await getJwt();
+    if (!token) {
+        console.log('用户未登录，跳过AI配置同步');
+        return;
+    }
+
+    try {
+        // 1. 获取服务器AI配置
+        const response = await fetch(`${API_BASE_URL}/user/settings/ai-config`, {
+            headers: { 'Authorization': `${token}` }
+        });
+
+        if (response.status === 404) {
+            console.log('服务器无AI配置，检查是否需要上传本地配置');
+            await uploadLocalAIConfigIfExists();
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(`获取服务器AI配置失败: ${response.status}`);
+        }
+
+        const serverConfigResponse = await response.json();
+        const serverConfig = serverConfigResponse.data || serverConfigResponse;
+
+        console.log('服务器AI配置原始数据:', JSON.stringify(serverConfigResponse, null, 2));
+        console.log('解析后的服务器配置:', JSON.stringify(serverConfig, null, 2));
+
+        // 2. 获取本地AI配置
+        const localData = await chrome.storage.local.get(['aiConfig', 'aiAnalysisDepth']);
+        const localConfig = localData.aiConfig || {};
+
+        console.log('本地AI配置:', localConfig);
+
+        // 3. 时间戳比较
+        const localTime = new Date(localConfig.lastModified || 0);
+        const serverTime = new Date(serverConfig.lastModified || 0);
+
+        console.log('AI配置时间戳比较:', {
+            local: localConfig.lastModified,
+            server: serverConfig.lastModified,
+            localTime: localTime.getTime(),
+            serverTime: serverTime.getTime(),
+            useServer: serverTime > localTime,
+            hasLocalConfig: !!localConfig.provider,
+            hasServerConfig: !!serverConfig.provider,
+            localConfigValid: !!(localConfig.provider && localConfig.apiKey),
+            serverConfigEmpty: Object.keys(serverConfig).length === 0
+        });
+
+        // 特别处理：服务器返回空对象的情况
+        if (Object.keys(serverConfig).length === 0) {
+            console.log('🔍 检测到服务器返回空对象，检查本地配置...');
+            if (localConfig.provider && localConfig.apiKey) {
+                console.log('✅ 本地有有效AI配置，立即上传到服务器');
+                await uploadAIConfigToServer(localConfig, localData.aiAnalysisDepth);
+                return; // 提前返回，避免后续逻辑
+            } else {
+                console.log('❌ 本地也无有效AI配置，跳过同步');
+                return;
+            }
+        }
+
+        if (serverTime > localTime) {
+            // 使用服务器配置（保留本地apiKey）
+            const mergedConfig = {
+                provider: serverConfig.provider,
+                model: serverConfig.model,
+                apiKey: localConfig.apiKey || '', // 保留本地完整apiKey
+                lastModified: serverConfig.lastModified
+            };
+
+            await chrome.storage.local.set({
+                aiConfig: mergedConfig,
+                aiAnalysisDepth: localData.aiAnalysisDepth || 'standard'
+            });
+
+            console.log('已使用服务器AI配置更新本地');
+        } else if (localTime > serverTime && localConfig.provider) {
+            // 本地配置更新，上传到服务器
+            console.log('本地AI配置更新，上传到服务器');
+            await uploadAIConfigToServer(localConfig, localData.aiAnalysisDepth);
+        } else if (localConfig.provider && localConfig.apiKey && !serverConfig.provider) {
+            // 服务器配置为空但本地有有效配置，上传本地配置
+            console.log('服务器AI配置为空，上传本地配置');
+            await uploadAIConfigToServer(localConfig, localData.aiAnalysisDepth);
+        } else if (localConfig.provider && localConfig.apiKey && (!serverConfig.lastModified || serverConfig.lastModified === localConfig.lastModified)) {
+            // 时间戳相同或服务器无时间戳，但本地有有效配置，上传确保服务器有完整数据
+            console.log('时间戳相同或服务器无时间戳，上传本地配置确保数据完整');
+            await uploadAIConfigToServer(localConfig, localData.aiAnalysisDepth);
+        } else {
+            console.log('AI配置时间戳比较结果：无需同步');
+
+            // 额外检查：如果本地有配置但服务器配置不完整，强制上传
+            if (localConfig.provider && localConfig.apiKey &&
+                (!serverConfig.provider || !serverConfig.apiKey || serverConfig.apiKey === '********')) {
+                console.log('检测到服务器配置不完整，强制上传本地配置');
+                await uploadAIConfigToServer(localConfig, localData.aiAnalysisDepth);
+            }
+        }
+
+    } catch (error) {
+        console.error('AI配置同步失败:', error);
+        throw error;
+    }
+}
+
+/**
+ * 检查并上传本地AI配置（如果存在且有效）
+ */
+async function uploadLocalAIConfigIfExists() {
+    const localData = await chrome.storage.local.get(['aiConfig', 'aiAnalysisDepth']);
+    const localConfig = localData.aiConfig || {};
+
+    if (localConfig.provider && localConfig.apiKey) {
+        console.log('发现本地AI配置，上传到服务器');
+        await uploadAIConfigToServer(localConfig, localData.aiAnalysisDepth);
+    } else {
+        console.log('本地无有效AI配置，跳过上传');
+    }
+}
+
+/**
+ * 上传AI配置到服务器
+ */
+async function uploadAIConfigToServer(config, analysisDepth) {
+    const token = await getJwt();
+    if (!token) return;
+
+    const configPayload = {
+        provider: config.provider,
+        apiKey: config.apiKey,
+        model: config.model
+    };
+
+    // 添加时间戳
+    if (!config.lastModified) {
+        configPayload.lastModified = new Date().toISOString();
+    }
+
+    try {
+
+        console.log('上传AI配置到服务器:', JSON.stringify(configPayload));
+
+
+        const response = await fetch(`${API_BASE_URL}/user/settings/ai-config`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `${token}`
+            },
+            body: JSON.stringify(configPayload)
+        });
+
+        if (!response.ok) {
+            throw new Error(`上传AI配置失败: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('AI配置已上传到服务器:', result);
+
+        // 更新本地配置的时间戳
+        const updatedConfig = {
+            ...config,
+            lastModified: result.data?.lastModified || new Date().toISOString()
+        };
+
+        await chrome.storage.local.set({ aiConfig: updatedConfig });
+
+    } catch (error) {
+        console.error('上传AI配置失败:', error);
+        throw error;
     }
 }
 

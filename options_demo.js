@@ -1,6 +1,7 @@
 // --- Authentication and Synchronization Logic ---
 
 const API_BASE_URL = 'https://bookmarker-api.aiwetalk.com/api';
+let i18nManager;
 
 // --- API Communication Functions ---
 async function apiLogin(email, password) {
@@ -43,7 +44,18 @@ async function apiGoogleLogin(googleCode) {
 }
 
 // --- Authentication Event Handlers & UI ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    i18nManager = new I18nManager();
+    try {
+        const { language: storedLang } = await chrome.storage.local.get('language');
+        const lang = storedLang || (chrome.i18n.getUILanguage().startsWith('zh') ? 'zh_CN' : 'en');
+        await i18nManager.loadMessages(lang);
+    } catch (error) {
+        console.error("Failed to load i18n in options_demo.js", error);
+        // Fallback to a dummy manager if loading fails
+        i18nManager = { get: (key, subs) => key };
+    }
+
     const showLoginModalBtn = document.getElementById('showLoginModalBtn');
     const loginModal = document.getElementById('loginModal');
     const closeLoginModalBtn = document.getElementById('closeLoginModalBtn');
@@ -216,9 +228,9 @@ async function updateUIForAuthState() {
         loggedOutView.classList.add('hidden');
         loggedInView.classList.remove('hidden');
 
-        const userName = "已认证用户"; // 使用这个作为显示名称
+        const userName = i18nManager.get('authenticatedUser'); // 使用这个作为显示名称
         userNameSpan.textContent = userName;
-        userEmailSpan.textContent = `用户ID: ${authData.userId.substring(0, 10)}...`;
+        userEmailSpan.textContent = i18nManager.get('userIdDisplay', { userId: authData.userId.substring(0, 10) });
 
         // --- 新增：生成并显示头像 ---
         if (userAvatarImg) {

@@ -28,27 +28,28 @@
 <body>
     <div id="learning-assistant-panel">
         <div id="la-header">
-            <h4>🎓 学习助手</h4>
+            <h4 data-i18n="learningAssistantTitle"></h4>
         </div>
         <div id="la-content">
-            <div id="assistant-placeholder"><p>请从选项页的书签列表中打开一个学习助手。</p></div>
+            <div id="assistant-placeholder"><p data-i18n="assistantPlaceholder"></p></div>
             <div id="assistant-main" style="display: none;">
                 <div class="la-section">
-                    <strong>针对本文提问:</strong>
+                    <strong data-i18n="askAboutArticle"></strong>
                     <div class="la-input-group">
-                        <textarea id="la-qa-input" placeholder="例如：文中提到的核心算法是什么？" rows="2"></textarea>
-                        <button id="la-ask-btn">提问</button>
+                        <textarea id="la-qa-input" data-i18n-placeholder="qaInputPlaceholder" rows="2"></textarea>
+                        <button id="la-ask-btn" data-i18n="askButton"></button>
                     </div>
                     <div id="la-qa-answer" class="la-answer-area"></div>
                 </div>
                 <div class="la-section">
-                    <strong>生成学习测验:</strong>
-                    <button id="la-quiz-btn">点击生成3-5个关键问题</button>
+                    <strong data-i18n="generateQuiz"></strong>
+                    <button id="la-quiz-btn" data-i18n="generateQuizButton"></button>
                     <div id="la-quiz-content" class="la-answer-area"></div>
                 </div>
             </div>
         </div>
     </div>
+    <script src="i18n.js"></script>
     <script src="sidepanel.js"></script>
 </body>
 </html>

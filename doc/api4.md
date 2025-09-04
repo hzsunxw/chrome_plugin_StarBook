@@ -235,76 +235,108 @@ Authorization: Bearer <your_jwt_token>
     }
     ```
 
-### 4.3 用户设置接口 (User Settings APIs)
+### 4.3 用户AI配置接口 (User AI Configuration APIs)
 
-这些接口用于管理用户级设置，如AI配置。AI配置被视为用户文档的一部分，支持全量获取和批量变更。
+这些接口遵循标准的RESTful设计，用于管理用户的AI服务配置。用户的AI配置是单一且独立的，不支持批量操作，以确保配置的原子性和一致性。
 
 #### `GET /api/user/settings/ai-config`
 
--   **功能:** 全量获取用户的AI配置。在用户登录或刷新时使用。
+-   **功能:** 获取当前用户的AI配置。
 -   **认证:** `Authorization: Bearer <token>`
--   **成功响应 (200):** 返回用户的AI配置对象。`apiKey`返回占位符（如`"********"`）以避免泄露明文。
+-   **成功响应 (200 OK):** 返回用户的AI配置对象。`apiKey`以脱敏形式（`"********"`）返回。
     ```json
     {
-      "provider": "OpenAI",
+      "userId": "507f1f77bcf86cd799439011",
+      "provider": "DeepSeek",
       "apiKey": "********",
-      "model": "gpt-4o",
-      "lastModified": "2025-08-15T10:00:00.000Z"
+      "model": "deepseek-chat",
+      "settings": {},
+      "lastModified": "2025-08-18T10:30:00.000Z"
     }
     ```
--   **失败响应 (404 Not Found):** 如果用户无AI配置。
+-   **失败响应 (404 Not Found):** 如果用户尚未设置AI配置。
     ```json
     {
       "error": "AI config not found"
     }
     ```
 
-#### `POST /api/user/settings/ai-config/sync`
+#### `POST /api/user/settings/ai-config`
 
--   **功能:** 批量变更AI配置。客户端可以将本地变更（如添加/更新字段）推送到服务器。支持部分更新（只发送改变的字段）。
+-   **功能:** 首次设置或完全替换用户的AI配置。这是一个原子操作，会覆盖所有旧的配置。
 -   **认证:** `Authorization: Bearer <token>`
--   **请求体 (Body):** 一个操作数组。每个操作包含 `type` (操作类型: `"add"` 或 `"update"`) 和 `payload` (配置负载)。
-    -   `"add"`: 用于首次设置完整配置。
-    -   `"update"`: 用于部分更新现有配置（`payload` 只包含需要更新的字段）。
-    ```json
-    [
-      {
-        "type": "add",
-        "payload": {
-          "provider": "OpenAI",
-          "apiKey": "sk-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-          "model": "gpt-4o"
-        }
-      }
-    ]
-    ```
-    或更新示例：
-    ```json
-    [
-      {
-        "type": "update",
-        "payload": {
-          "model": "gpt-4-turbo"
-        }
-      }
-    ]
-    ```
--   **成功响应 (200):** 返回更新后的完整AI配置对象（`apiKey`为占位符），并包含服务器时间戳。
+-   **请求体 (Body):**
     ```json
     {
-      "message": "AI config sync successful",
+      "provider": "DeepSeek",
+      "apiKey": "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "model": "deepseek-chat"
+    }
+    ```
+-   **字段说明:**
+    -   `provider` (String, 必需): AI提供商名称。
+    -   `apiKey` (String, 必需): 对应的API密钥。
+    -   `model` (String, 可选): 模型名称。如果未提供，将使用该提供商的默认模型。
+-   **成功响应 (200 OK):**
+    ```json
+    {
+      "message": "AI config updated successfully",
       "data": {
-        "provider": "OpenAI",
+        "userId": "507f1f77bcf86cd799439011",
+        "provider": "DeepSeek",
         "apiKey": "********",
-        "model": "gpt-4-turbo",
-        "lastModified": "2025-08-15T10:05:00.000Z"
+        "model": "deepseek-chat",
+        "lastModified": "2025-08-18T10:35:00.000Z"
       }
     }
     ```
--   **失败响应 (400 Bad Request):** 无效的`payload`（如缺少必需字段）。
+
+#### `PUT /api/user/settings/ai-config`
+
+-   **功能:** 部分更新现有的AI配置。只修改请求体中提供的字段。
+-   **认证:** `Authorization: Bearer <token>`
+-   **智能处理:**
+    -   如果只更新 `provider`，系统会自动切换到新提供商的默认模型。
+    -   可以独立更新 `model` 或 `apiKey`。
+-   **请求体示例 (只更新模型):**
     ```json
     {
-      "error": "Invalid AI config: provider is required"
+      "model": "deepseek-coder"
+    }
+    ```
+-   **成功响应 (200 OK):**
+    ```json
+    {
+      "message": "AI config updated successfully",
+      "data": {
+        "provider": "DeepSeek",
+        "apiKey": "********",
+        "model": "deepseek-coder",
+        "lastModified": "2025-08-18T10:40:00.000Z"
+      }
+    }
+    ```
+-   **失败响应 (404 Not Found):** 尝试更新一个不存在的配置。
+    ```json
+    {
+      "error": "AI config not found. Please create a configuration first."
+    }
+    ```
+
+#### `DELETE /api/user/settings/ai-config`
+
+-   **功能:** 删除用户的AI配置。
+-   **认证:** `Authorization: Bearer <token>`
+-   **成功响应 (200 OK):**
+    ```json
+    {
+      "message": "AI config deleted successfully"
+    }
+    ```
+-   **失败响应 (404 Not Found):**
+    ```json
+    {
+      "error": "AI config not found"
     }
     ```
 
@@ -323,47 +355,11 @@ WebSocket用于在用户在线时，实时、双向地同步单个项目的变�
 -   **Event: `item:delete`**
     -   **功能:** 实时删除一个项目。
     -   **负载:** `data` 对象**必须**包含 `_id`。
--   **Event: `user:ai_config:add`**
-    -   **功能:** 实时添加/设置AI配置（首次）。
-    -   **负载:** `payload` 对象包含完整配置。
-        ```json
-        {
-          "event": "user:ai_config:add",
-          "payload": {
-            "provider": "OpenAI",
-            "apiKey": "sk-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-            "model": "gpt-4o"
-          }
-        }
-        ```
--   **Event: `user:ai_config:update`**
-    -   **功能:** 实时更新AI配置（部分字段）。
-    -   **负载:** `payload` 对象包含需要更新的字段。
-        ```json
-        {
-          "event": "user:ai_config:update",
-          "payload": {
-            "model": "gpt-4-turbo"
-          }
-        }
-        ```
 
 ### 5.2 服务器 -> 客户端 (Server-to-Client Events)
 
 -   **Event: `action:confirm`**
-    -   **功能:** 对客户端发起的某个操作进行成功确认。对于 `item:add` 的确认，`data` 中会包含新项目的完整对象（含 `_id`），用于客户端进行“ID换证”。对于AI配置操作，返回更新后的配置（`apiKey`为占位符）。
-        ```json
-        {
-          "event": "action:confirm",
-          "operation": "user:ai_config:update",
-          "data": {
-            "provider": "OpenAI",
-            "apiKey": "********",
-            "model": "gpt-4-turbo",
-            "lastModified": "2025-08-15T10:05:00.000Z"
-          }
-        }
-        ```
+    -   **功能:** 对客户端发起的某个操作进行成功确认。对于 `item:add` 的确认，`data` 中会包含新项目的完整对象（含 `_id`），用于客户端进行“ID换证”。
 -   **Event: `action:error`**
     -   **功能:** 通知客户端某个操作处理失败，并附带错误信息。
         ```json
@@ -382,17 +378,5 @@ WebSocket用于在用户在线时，实时、双向地同步单个项目的变�
 -   **Event: `broadcast:item_deleted`**
     -   **功能:** 广播一个项目被删除的事件。
     -   **负载:** `{ "_id": "item_id_that_was_deleted" }`
-    -   **客户端操作:** 客户端收到此事件后，需根据 `_id` 在本地移除该项目。如果被删除的是文件夹，客户端有责任递归删除其下的所有子项目，以保持UI的一致性。
--   **Event: `broadcast:user_ai_config_updated`**
-    -   **功能:** 广播给其他客户端，通知AI配置被更新。
-    -   **负载:** 更新后的配置对象（`apiKey`为占位符）。
-        ```json
-        {
-          "event": "broadcast:user_ai_config_updated",
-          "data": {
-            "provider": "OpenAI",
-            "apiKey": "********",
-            "model": "gpt-4-turbo",
-            "lastModified": "2025-08-15T10:05:00.000Z"
-          }
-        }
+    -   **客户端操作:** 客户端收到此事件后，需根据 `_id` 在本地移除该项目。如果被删除的是文件夹，客户端有责任递归删除其下的所有子项目，以保持UI的一-致性。
+>>>>>>> 6dfb63de64ba09cebd49f6cc79fe56e8b79a7370
