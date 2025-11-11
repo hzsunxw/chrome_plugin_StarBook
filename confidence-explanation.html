@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能分类置信度说明</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 1000px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #e8f5e8; border-color: #4caf50; }
+        .info { background: #e3f2fd; border-color: #2196f3; }
+        .warning { background: #fff3e0; border-color: #ff9800; }
+        .confidence-demo { background: #ff9800; color: white; border-radius: 10px; padding: 4px 8px; font-size: 12px; font-weight: 600; display: inline-block; margin: 0 4px; }
+        .confidence-high { background: #4caf50; }
+        .confidence-medium { background: #ff9800; }
+        .confidence-low { background: #f44336; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+        th { background: #f5f5f5; }
+        .example { padding: 15px; background: #f8f9fa; border-radius: 8px; margin: 10px 0; border-left: 4px solid #2196f3; }
+        .smart-category-demo { 
+            background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%); color: white; border-radius: 14px; 
+            padding: 4px 10px; font-size: 11px; font-weight: 500; display: inline-block; margin: 2px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 智能分类置信度说明</h1>
+    
+    <div class="section info">
+        <h2>🤔 什么是置信度？</h2>
+        <p><strong>置信度（Confidence）</strong>是人工智能对其分类结果的信心程度的量化表示。</p>
+        
+        <h3>简单理解</h3>
+        <ul>
+            <li>📊 <strong>85%置信度</strong> = AI有85%的把握认为这个分类是正确的</li>
+            <li>🎯 <strong>数值范围</strong>：0% - 100%，数值越高表示AI越有信心</li>
+            <li>🧠 <strong>类比理解</strong>：就像人类说"我有八成把握这是对的"</li>
+        </ul>
+        
+        <div class="example">
+            <h4>实际例子</h4>
+            <p>对于书签"北疆自驾游攻略"：</p>
+            <div style="margin: 10px 0;">
+                <span class="smart-category-demo">自驾攻略</span>
+                <span class="confidence-demo confidence-high">85%</span>
+            </div>
+            <p><strong>含义</strong>：AI分析了网页内容后，有85%的信心认为这个书签属于"自驾攻略"分类。</p>
+        </div>
+    </div>
+
+    <div class="section success">
+        <h2>📈 置信度等级划分</h2>
+        
+        <table>
+            <tr>
+                <th>置信度范围</th>
+                <th>等级</th>
+                <th>颜色标识</th>
+                <th>含义</th>
+                <th>建议</th>
+            </tr>
+            <tr>
+                <td>90% - 100%</td>
+                <td>非常高</td>
+                <td><span class="confidence-demo confidence-high">95%</span></td>
+                <td>AI非常确信分类正确</td>
+                <td>可以完全信任</td>
+            </tr>
+            <tr>
+                <td>70% - 89%</td>
+                <td>高</td>
+                <td><span class="confidence-demo confidence-medium">85%</span></td>
+                <td>AI比较确信分类正确</td>
+                <td>通常可以信任</td>
+            </tr>
+            <tr>
+                <td>50% - 69%</td>
+                <td>中等</td>
+                <td><span class="confidence-demo confidence-medium">60%</span></td>
+                <td>AI有一定把握但不太确定</td>
+                <td>建议人工确认</td>
+            </tr>
+            <tr>
+                <td>30% - 49%</td>
+                <td>低</td>
+                <td><span class="confidence-demo confidence-low">40%</span></td>
+                <td>AI不太确信分类正确</td>
+                <td>需要人工审核</td>
+            </tr>
+            <tr>
+                <td>0% - 29%</td>
+                <td>很低</td>
+                <td><span class="confidence-demo confidence-low">20%</span></td>
+                <td>AI基本不确定</td>
+                <td>建议重新分类</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section warning">
+        <h2>🔍 置信度的影响因素</h2>
+        
+        <h3>影响置信度高低的因素</h3>
+        <ul>
+            <li>📝 <strong>内容清晰度</strong>：网页内容越清晰明确，置信度越高</li>
+            <li>🎯 <strong>主题明确性</strong>：单一主题的内容比混合主题置信度更高</li>
+            <li>📊 <strong>关键词密度</strong>：相关关键词出现频率影响判断准确性</li>
+            <li>🏷️ <strong>分类边界</strong>：明确的分类边界比模糊边界置信度更高</li>
+            <li>📚 <strong>训练数据</strong>：AI在某些领域的训练数据越多，置信度越高</li>
+        </ul>
+        
+        <h3>实际案例分析</h3>
+        <div class="example">
+            <h4>高置信度案例 (90%+)</h4>
+            <p><strong>书签</strong>："Python入门教程 - 基础语法详解"</p>
+            <p><strong>分类</strong>：<span class="smart-category-demo">编程教程</span> <span class="confidence-demo confidence-high">92%</span></p>
+            <p><strong>原因</strong>：标题和内容都明确指向编程教程，关键词清晰</p>
+        </div>
+        
+        <div class="example">
+            <h4>中等置信度案例 (60-70%)</h4>
+            <p><strong>书签</strong>："如何提高工作效率的10个小技巧"</p>
+            <p><strong>分类</strong>：<span class="smart-category-demo">职场技能</span> <span class="confidence-demo confidence-medium">65%</span></p>
+            <p><strong>原因</strong>：可能同时涉及职场技能、生活技巧等多个分类</p>
+        </div>
+        
+        <div class="example">
+            <h4>低置信度案例 (40%以下)</h4>
+            <p><strong>书签</strong>："今天的随想"</p>
+            <p><strong>分类</strong>：<span class="smart-category-demo">个人博客</span> <span class="confidence-demo confidence-low">35%</span></p>
+            <p><strong>原因</strong>：标题过于模糊，内容主题不明确</p>
+        </div>
+    </div>
+
+    <div class="section info">
+        <h2>🎯 如何使用置信度信息</h2>
+        
+        <h3>对用户的实用价值</h3>
+        <ol>
+            <li><strong>快速判断</strong>：
+                <ul>
+                    <li>高置信度(80%+)：可以直接信任AI的分类</li>
+                    <li>中等置信度(50-80%)：作为参考，可能需要确认</li>
+                    <li>低置信度(50%以下)：建议人工重新分类</li>
+                </ul>
+            </li>
+            
+            <li><strong>批量处理</strong>：
+                <ul>
+                    <li>优先处理高置信度的分类结果</li>
+                    <li>对低置信度的结果进行人工审核</li>
+                </ul>
+            </li>
+            
+            <li><strong>质量控制</strong>：
+                <ul>
+                    <li>监控整体置信度分布</li>
+                    <li>识别需要改进的分类场景</li>
+                </ul>
+            </li>
+        </ol>
+        
+        <h3>最佳实践建议</h3>
+        <ul>
+            <li>✅ <strong>信任高置信度</strong>：85%以上的分类通常很准确</li>
+            <li>⚠️ <strong>审核中等置信度</strong>：50-85%的分类建议快速确认</li>
+            <li>❌ <strong>重新处理低置信度</strong>：50%以下的分类建议人工重新分类</li>
+            <li>📊 <strong>关注趋势</strong>：如果某类内容置信度普遍较低，可能需要优化</li>
+        </ul>
+    </div>
+
+    <div class="section success">
+        <h2>🔧 技术实现细节</h2>
+        
+        <h3>置信度的计算来源</h3>
+        <ul>
+            <li>🤖 <strong>AI分析结果</strong>：来自AI模型对内容分析的内部评分</li>
+            <li>📊 <strong>多因素综合</strong>：考虑内容匹配度、关键词权重等</li>
+            <li>🎯 <strong>标准化处理</strong>：转换为0-1之间的数值，显示为百分比</li>
+        </ul>
+        
+        <h3>在系统中的应用</h3>
+        <ul>
+            <li>📝 <strong>AI重新分析</strong>：置信度固定为80%（基于完整内容分析）</li>
+            <li>🔄 <strong>独立分类</strong>：置信度来自分类AI的实际评估</li>
+            <li>💾 <strong>数据存储</strong>：保存在<code>smartCategoriesConfidence</code>字段</li>
+        </ul>
+        
+        <h3>显示逻辑</h3>
+        <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px;">
+// 置信度显示逻辑
+${bookmark.smartCategoriesConfidence ? 
+  `&lt;span class="confidence-badge" title="AI分类置信度说明"&gt;
+    ${Math.round(bookmark.smartCategoriesConfidence * 100)}%
+  &lt;/span&gt;` 
+  : ''}
+        </div>
+    </div>
+
+    <div class="section warning">
+        <h2>❓ 常见问题解答</h2>
+        
+        <h3>Q: 为什么有些书签没有显示置信度？</h3>
+        <p><strong>A:</strong> 可能的原因：</p>
+        <ul>
+            <li>书签还没有进行AI分析</li>
+            <li>AI分析失败或不完整</li>
+            <li>使用的是旧版本数据（没有置信度字段）</li>
+        </ul>
+        
+        <h3>Q: 置信度85%算高还是低？</h3>
+        <p><strong>A:</strong> 85%属于<strong>高置信度</strong>，表示AI比较确信分类正确，通常可以信任这个结果。</p>
+        
+        <h3>Q: 如果置信度很低怎么办？</h3>
+        <p><strong>A:</strong> 建议：</p>
+        <ul>
+            <li>点击"🔄重新生成AI数据"按钮重新分析</li>
+            <li>检查网页内容是否清晰明确</li>
+            <li>考虑人工设置更准确的分类</li>
+        </ul>
+        
+        <h3>Q: 置信度会随时间变化吗？</h3>
+        <p><strong>A:</strong> 置信度只有在重新进行AI分析时才会更新，不会自动变化。</p>
+    </div>
+
+    <div class="section success">
+        <h2>🎉 总结</h2>
+        <p><strong>智能分类置信度</strong>是AI分类系统的重要质量指标：</p>
+        <ul>
+            <li>📊 <strong>85%置信度</strong> = AI有85%把握认为分类正确</li>
+            <li>🎯 <strong>高置信度(80%+)</strong>：可以信任，分类准确</li>
+            <li>⚠️ <strong>中等置信度(50-80%)</strong>：建议确认</li>
+            <li>❌ <strong>低置信度(50%以下)</strong>：需要人工审核</li>
+            <li>🔄 <strong>持续优化</strong>：通过重新分析提高准确性</li>
+        </ul>
+        
+        <p>现在您可以更好地理解和使用智能分类功能了！🚀</p>
+    </div>
+
+    <script>
+        console.log('📊 智能分类置信度说明页面加载完成！');
+        console.log('💡 置信度含义：');
+        console.log('  📈 85% = AI有85%把握认为分类正确');
+        console.log('  🎯 高置信度(80%+)：可以信任');
+        console.log('  ⚠️ 中等置信度(50-80%)：建议确认');
+        console.log('  ❌ 低置信度(50%以下)：需要审核');
+        console.log('🔧 用户现在可以更好地理解和使用智能分类功能！');
+    </script>
+</body>
+</html>

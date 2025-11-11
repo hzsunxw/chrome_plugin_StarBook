@@ -8,6 +8,7 @@ const API_BASE_URL = 'https://bookmarker-api.aiwetalk.com/api';
 let taskQueue = []; // Now stores only bookmark IDs
 let isProcessingQueue = false;
 let queueGeneration = 0; // 新增：任务世代计数器
+let processingTasks = new Set(); // 新增：正在处理中的任务集合
 const CONCURRENT_LIMIT = 3; // Simultaneously process 3 AI tasks
 
 // --- Context Menu ID ---
@@ -24,20 +25,32 @@ async function getJwt() {
 }
 
 
+// --- Queue Status Check Function ---
+function isTaskInActiveQueue(bookmarkId) {
+    // 检查任务是否在队列中或正在处理中
+    return taskQueue.includes(bookmarkId) || processingTasks.has(bookmarkId);
+}
+
 // --- Enqueue Task Function ---
 async function enqueueTask(bookmarkId) {
-    if (taskQueue.includes(bookmarkId)) {
+    // 如果任务已经在队列中或正在处理中，不允许重新入队
+    if (isTaskInActiveQueue(bookmarkId)) {
         return false;
     }
 
     const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
-    const bookmark = bookmarkItems.find(b => b.id === bookmarkId);
+    // 使用 clientId 查找书签
+    const bookmark = bookmarkItems.find(b => b.clientId === bookmarkId);
+
+    // 如果任务不在队列中但状态是processing，说明状态卡住了，允许重新入队
+    // 这种情况发生在队列处理器中断但状态没有正确更新的情况下
     if (bookmark && bookmark.aiStatus === 'processing') {
-        return false;
+        console.log(`任务 ${bookmarkId} 状态卡住，重新添加到队列`);
+        // 继续执行，允许重新入队
     }
 
     if (bookmark) {
-        const index = bookmarkItems.findIndex(b => b.id === bookmarkId);
+        const index = bookmarkItems.findIndex(b => b.clientId === bookmarkId);
         if (index !== -1) {
             bookmarkItems[index].aiStatus = 'processing';
             bookmarkItems[index].aiError = '';
@@ -76,8 +89,10 @@ async function recoverStuckTasks() {
     );
 
     if (stuckItems.length > 0) {
+        console.log(`恢复 ${stuckItems.length} 个卡住的AI任务`);
         for (const item of stuckItems) {
-            await enqueueTask(item.id);
+            // 使用 clientId 作为主要标识符
+            await enqueueTask(item.clientId);
         }
     }
 }
@@ -93,6 +108,18 @@ async function handleMessages(request, sender, sendResponse) {
         const { action, id, data } = request;
 
         switch (action) {
+            case 'syncSmartCategories': {
+                syncSmartCategories()
+                    .then(() => sendResponse({ status: 'success' }))
+                    .catch(err => sendResponse({ status: 'error', message: err.message }));
+                return true; // Indicates async response
+            }
+            case 'syncAIConfig': {
+                syncAIConfigAfterLogin()
+                    .then(() => sendResponse({ status: 'success' }))
+                    .catch(err => sendResponse({ status: 'error', message: err.message }));
+                return true; // Indicates async response
+            }
             case 'getI18nMessages': {
                 const { lang } = request;
                 const url = chrome.runtime.getURL(`_locales/${lang}/messages.json`);
@@ -299,7 +326,12 @@ async function handleMessages(request, sender, sendResponse) {
                         notes: '',
                         contentType: '', // Added new field with default value
                         estimatedReadTime: null, // Added new field with default value
-                        readingLevel: '' // Added new field with default value
+                        readingLevel: '', // Added new field with default value
+                        // === 新增智能分类字段 ===
+                        smartCategories: [], // AI智能分类标签数组
+                        smartCategoriesUpdated: null, // 分类更新时间
+                        smartCategoriesVersion: 0, // 分类算法版本
+                        smartCategoriesConfidence: null // AI分类置信度
                     };
 
                     bookmarkItems.unshift(newBookmark);
@@ -397,7 +429,16 @@ async function handleMessages(request, sender, sendResponse) {
                     sendResponse({ status: 'success', restartedCount });
                 })();
                 return true; // Keep channel open for async response
-            }            
+            }
+            case 'recoverStuckTasks': {
+                (async () => {
+                    await recoverStuckTasks();
+                    sendResponse({ status: 'success', message: 'Stuck tasks recovery initiated' });
+                })();
+                return true; // Keep channel open for async response
+            }
+            // === 智能分类相关消息处理（已整合到AI分析中） ===
+            // 智能分类现在通过AI分析队列统一处理，不再需要独立的分类消息
             default:
                 sendResponse({ status: 'error', message: 'Unknown action' });
                 break;
@@ -461,7 +502,9 @@ async function importBrowserBookmarks(sendResponse) {
                 const newBookmark = {
                     clientId: crypto.randomUUID(), parentId: parentInfo.clientId, title: node.title || 'No Title',
                     url: node.url, type: 'bookmark', isStarred: false, summary: '', tags: [], aiStatus: 'pending',
-                    notes: '', contentType: '', estimatedReadTime: null, readingLevel: ''
+                    notes: '', contentType: '', estimatedReadTime: null, readingLevel: '',
+                    // === 新增智能分类字段 ===
+                    smartCategories: [], smartCategoriesUpdated: null, smartCategoriesVersion: 0, smartCategoriesConfidence: null
                 };
                 newBookmarks.push(newBookmark);
             }
@@ -727,9 +770,14 @@ async function handleAsyncBookmarkAction(action, data, tab) {
             notes: '',
             summary: '',
             aiStatus: 'pending',
-            contentType: '', 
-            estimatedReadTime: null, 
-            readingLevel: '' 
+            contentType: '',
+            estimatedReadTime: null,
+            readingLevel: '',
+            // === 新增智能分类字段 ===
+            smartCategories: [],
+            smartCategoriesUpdated: null,
+            smartCategoriesVersion: 0,
+            smartCategoriesConfidence: null
         };
         delete newBookmark.id; // Ensure the old 'id' field is gone.
 
@@ -942,13 +990,7 @@ async function initiateMergeSync() {
         await chrome.storage.local.set({ bookmarkItems: finalItemsToStore });
 
         // --- 6. 同步AI配置 ---
-        try {
-            console.log("开始同步AI配置...");
-            await syncAIConfigAfterLogin();
-            console.log("AI配置同步完成");
-        } catch (aiSyncError) {
-            console.warn("AI配置同步失败，但不影响书签同步:", aiSyncError);
-        }
+        // AI配置同步已在登录时独立处理，此处不再调用
 
         console.log(`Merge sync complete. Local store updated with ${finalItemsToStore.length} items.`);
         return { status: "success", count: finalItemsToStore.length };
@@ -961,9 +1003,649 @@ async function initiateMergeSync() {
     }
 }
 
+// ===== AI智能分类相关函数 =====
+
 /**
- * 登录后同步AI配置
- * 从服务器获取AI配置并与本地配置进行时间戳比较
+ * 为书签进行AI智能分类
+ * @param {string} bookmarkId - 书签ID (clientId)
+ * @returns {Object} 分类结果
+ */
+async function classifyBookmarkWithAI(bookmarkId) {
+    try {
+        const bookmark = await getBookmarkById(bookmarkId);
+        if (!bookmark) {
+            throw new Error(`书签不存在: ${bookmarkId}`);
+        }
+
+        // 检查AI配置
+        const { aiConfig } = await chrome.storage.local.get("aiConfig");
+        if (!aiConfig || !aiConfig.apiKey) {
+            throw new Error('AI配置未设置，请先在设置页面配置AI服务');
+        }
+
+        console.log(`开始为书签 "${bookmark.title}" 进行AI分类，使用提供商: ${aiConfig.provider}`);
+
+        // 获取现有的智能分类列表
+        const existingCategories = await getExistingSmartCategories();
+
+        // 构建AI分类prompt
+        const prompt = await buildClassificationPrompt(bookmark, existingCategories);
+
+        // 调用AI API
+        const aiResponse = await callAIForClassification(prompt);
+
+        console.log(`书签 "${bookmark.title}" 的AI分类结果:`, aiResponse);
+
+        return {
+            bookmarkId: bookmarkId,
+            categories: aiResponse.chosen_categories || [],
+            newCategory: aiResponse.new_category || null,
+            confidence: aiResponse.confidence || 0.5,
+            reasoning: aiResponse.reasoning || ''
+        };
+    } catch (error) {
+        console.error(`AI分类失败 ${bookmarkId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * 构建AI分类的prompt（支持国际化）
+ */
+async function buildClassificationPrompt(bookmark, existingCategories) {
+    // 获取用户语言设置
+    const { language: langCode = 'en' } = await chrome.storage.local.get('language');
+    const isChinese = langCode.startsWith('zh');
+
+    // 构建分类列表文本
+    const categoriesText = existingCategories.length > 0
+        ? existingCategories.map(cat => {
+            const keywordsText = cat.keywords?.join(', ') || (isChinese ? '无' : 'none');
+            return isChinese
+                ? `- ${cat.name} (关键词: ${keywordsText})`
+                : `- ${cat.name} (keywords: ${keywordsText})`;
+        }).join('\n')
+        : (isChinese ? '- 暂无现有分类' : '- No existing categories');
+
+    // 根据语言选择提示词模板
+    if (isChinese) {
+        return `你是一个专业的网页内容分类助手。请为以下网页内容进行智能分类。
+
+网页信息：
+- 标题：${bookmark.title}
+- URL：${bookmark.url}
+- 内容摘要：${bookmark.summary || '无'}
+- 现有标签：${bookmark.tags?.join(', ') || '无'}
+- 关键词：${bookmark.keyPoints?.join(', ') || '无'}
+- 内容类型：${bookmark.contentType || '无'}
+
+现有分类列表：
+${categoriesText}
+
+分类规则：
+1. 优先从现有分类中选择1-3个最匹配的分类
+2. 如果现有分类都不合适，可以创建1个新分类（2-6个字）
+3. 新分类名称要简洁明确，避免重复
+4. 所有分类必须使用简体中文
+
+请严格按照以下JSON格式返回结果，不要添加任何其他文字：
+
+{
+  "chosen_categories": ["分类1", "分类2"],
+  "new_category": null,
+  "confidence": 0.85,
+  "reasoning": "分类理由"
+}`;
+    } else {
+        return `You are a professional web content classification assistant. Please classify the following web content intelligently.
+
+Web Information:
+- Title: ${bookmark.title}
+- URL: ${bookmark.url}
+- Summary: ${bookmark.summary || 'none'}
+- Existing Tags: ${bookmark.tags?.join(', ') || 'none'}
+- Key Points: ${bookmark.keyPoints?.join(', ') || 'none'}
+- Content Type: ${bookmark.contentType || 'none'}
+
+Existing Categories List:
+${categoriesText}
+
+Classification Rules:
+1. Prioritize selecting 1-3 most matching categories from existing categories
+2. If existing categories are not suitable, create 1 new category (2-6 words)
+3. New category names should be concise and clear, avoiding duplication
+4. All categories must be in English
+
+Please return results strictly in the following JSON format, without any other text:
+
+{
+  "chosen_categories": ["category1", "category2"],
+  "new_category": null,
+  "confidence": 0.85,
+  "reasoning": "classification reasoning"
+}`;
+    }
+}
+
+/**
+ * 调用AI API进行分类
+ */
+async function callAIForClassification(prompt) {
+    try {
+        // 获取AI配置
+        const { aiConfig } = await chrome.storage.local.get("aiConfig");
+        if (!aiConfig || !aiConfig.apiKey) {
+            throw new Error('AI配置未设置或API密钥缺失');
+        }
+
+        // 复用现有的AI调用逻辑
+        const response = await callAI(aiConfig, prompt);
+
+        console.log('AI分类原始响应:', response);
+
+        // 尝试多种方式解析JSON响应
+        let result = null;
+
+        // 方法1: 直接解析整个响应
+        try {
+            result = JSON.parse(response);
+        } catch (e) {
+            console.log('方法1失败，尝试方法2');
+        }
+
+        // 方法2: 查找JSON块
+        if (!result) {
+            const jsonMatch = response.match(/\{[\s\S]*?\}/);
+            if (jsonMatch) {
+                try {
+                    result = JSON.parse(jsonMatch[0]);
+                } catch (e) {
+                    console.log('方法2失败，尝试方法3');
+                }
+            }
+        }
+
+        // 方法3: 查找更复杂的JSON模式
+        if (!result) {
+            const patterns = [
+                /```json\s*(\{[\s\S]*?\})\s*```/,
+                /```\s*(\{[\s\S]*?\})\s*```/,
+                /(\{[\s\S]*"chosen_categories"[\s\S]*?\})/,
+                /(\{[\s\S]*?\})/g
+            ];
+
+            for (const pattern of patterns) {
+                const matches = response.match(pattern);
+                if (matches) {
+                    for (const match of Array.isArray(matches) ? matches : [matches]) {
+                        const jsonStr = match.replace(/```json|```/g, '').trim();
+                        try {
+                            result = JSON.parse(jsonStr);
+                            if (result && typeof result === 'object') {
+                                console.log('成功解析JSON，使用模式:', pattern);
+                                break;
+                            }
+                        } catch (e) {
+                            continue;
+                        }
+                    }
+                    if (result) break;
+                }
+            }
+        }
+
+        // 如果仍然无法解析，尝试从响应中提取信息
+        if (!result) {
+            console.log('无法解析JSON，尝试文本提取');
+            result = extractCategoriesFromText(response);
+        }
+
+        // 验证和标准化响应格式
+        if (!result || typeof result !== 'object') {
+            result = {};
+        }
+
+        if (!result.chosen_categories || !Array.isArray(result.chosen_categories)) {
+            result.chosen_categories = [];
+        }
+
+        console.log('最终解析结果:', result);
+        return result;
+    } catch (error) {
+        console.error('AI分类调用失败:', error);
+        // 返回默认结果
+        return {
+            chosen_categories: [],
+            new_category: null,
+            confidence: 0.1,
+            reasoning: `AI调用失败: ${error.message}`
+        };
+    }
+}
+
+/**
+ * 从AI响应文本中提取分类信息（当JSON解析失败时的备用方案）
+ */
+function extractCategoriesFromText(text) {
+    const result = {
+        chosen_categories: [],
+        new_category: null,
+        confidence: 0.3,
+        reasoning: '从文本中提取的分类信息'
+    };
+
+    try {
+        // 查找可能的分类关键词
+        const categoryPatterns = [
+            /分类[：:]\s*([^\n\r]+)/i,
+            /categories[：:]\s*([^\n\r]+)/i,
+            /chosen_categories[：:]\s*\[([^\]]+)\]/i,
+            /选择的分类[：:]\s*([^\n\r]+)/i
+        ];
+
+        for (const pattern of categoryPatterns) {
+            const match = text.match(pattern);
+            if (match) {
+                const categoriesText = match[1];
+                // 提取分类名称
+                const categories = categoriesText
+                    .split(/[,，、]/)
+                    .map(cat => cat.replace(/["""'']/g, '').trim())
+                    .filter(cat => cat.length > 0 && cat.length < 20);
+
+                if (categories.length > 0) {
+                    result.chosen_categories = categories.slice(0, 3); // 最多3个分类
+                    break;
+                }
+            }
+        }
+
+        // 如果没有找到分类，尝试基于内容推断
+        if (result.chosen_categories.length === 0) {
+            const commonCategories = inferCategoriesFromContent(text);
+            result.chosen_categories = commonCategories;
+        }
+
+    } catch (error) {
+        console.error('文本提取分类失败:', error);
+    }
+
+    return result;
+}
+
+/**
+ * 基于内容推断可能的分类
+ */
+function inferCategoriesFromContent(text) {
+    const categories = [];
+    const lowerText = text.toLowerCase();
+
+    // 技术相关
+    if (lowerText.includes('ai') || lowerText.includes('人工智能') || lowerText.includes('机器学习')) {
+        categories.push('人工智能');
+    }
+    if (lowerText.includes('开发') || lowerText.includes('编程') || lowerText.includes('代码')) {
+        categories.push('开发工具');
+    }
+    if (lowerText.includes('设计') || lowerText.includes('ui') || lowerText.includes('ux')) {
+        categories.push('设计资源');
+    }
+
+    // 内容类型
+    if (lowerText.includes('新闻') || lowerText.includes('资讯')) {
+        categories.push('新闻资讯');
+    }
+    if (lowerText.includes('学习') || lowerText.includes('教程') || lowerText.includes('课程')) {
+        categories.push('学习资料');
+    }
+    if (lowerText.includes('工具') || lowerText.includes('软件')) {
+        categories.push('实用工具');
+    }
+
+    return categories.slice(0, 2); // 最多返回2个推断的分类
+}
+
+/**
+ * 获取现有的智能分类列表
+ * 修复：即使在重新分析模式下清空了书签分类，也能从配置中获取历史分类信息
+ */
+async function getExistingSmartCategories() {
+    try {
+        const data = await chrome.storage.local.get(['bookmarkItems', 'smartCategoriesConfig']);
+        const bookmarks = data.bookmarkItems || [];
+        const config = data.smartCategoriesConfig || { categories: {} };
+
+        // 从书签数据中统计现有分类
+        const categoryMap = new Map();
+
+        bookmarks.forEach(bookmark => {
+            if (bookmark.type === 'bookmark' && bookmark.smartCategories) {
+                bookmark.smartCategories.forEach(category => {
+                    if (!categoryMap.has(category)) {
+                        categoryMap.set(category, {
+                            name: category,
+                            count: 0,
+                            keywords: []
+                        });
+                    }
+                    categoryMap.get(category).count++;
+                });
+            }
+        });
+
+        // 【修复关键】：如果从书签中没有找到分类（比如重新分析时被清空），
+        // 则从配置中获取历史分类信息
+        if (categoryMap.size === 0 && config.categories) {
+            Object.keys(config.categories).forEach(categoryName => {
+                const categoryInfo = config.categories[categoryName];
+                if (categoryInfo && categoryInfo.count > 0) {
+                    categoryMap.set(categoryName, {
+                        name: categoryName,
+                        count: categoryInfo.count,
+                        keywords: categoryInfo.keywords || []
+                    });
+                }
+            });
+        } else {
+            // 合并配置中的关键词信息
+            for (let [name, info] of categoryMap) {
+                if (config.categories[name]) {
+                    info.keywords = config.categories[name].keywords || [];
+                }
+            }
+        }
+
+        return Array.from(categoryMap.values()).sort((a, b) => b.count - a.count);
+    } catch (error) {
+        console.error('获取现有分类失败:', error);
+        return [];
+    }
+}
+
+/**
+ * 根据ID获取书签
+ */
+async function getBookmarkById(bookmarkId) {
+    try {
+        const data = await chrome.storage.local.get('bookmarkItems');
+        const bookmarks = data.bookmarkItems || [];
+        return bookmarks.find(b => b.clientId === bookmarkId || b.serverId === bookmarkId);
+    } catch (error) {
+        console.error('获取书签失败:', error);
+        return null;
+    }
+}
+
+/**
+ * 更新书签的智能分类
+ */
+async function updateBookmarkSmartCategories(bookmarkId, classificationResult) {
+    try {
+        const data = await chrome.storage.local.get('bookmarkItems');
+        const bookmarks = data.bookmarkItems || [];
+
+        const bookmarkIndex = bookmarks.findIndex(b =>
+            b.clientId === bookmarkId || b.serverId === bookmarkId
+        );
+
+        if (bookmarkIndex === -1) {
+            throw new Error(`书签不存在: ${bookmarkId}`);
+        }
+
+        // 合并分类结果
+        let finalCategories = [...classificationResult.categories];
+
+        // 如果有新分类，添加到列表中
+        if (classificationResult.newCategory) {
+            finalCategories.push(classificationResult.newCategory);
+        }
+
+        // 去重和规范化
+        finalCategories = [...new Set(finalCategories)].filter(cat => cat && cat.trim());
+
+        // 更新书签数据
+        bookmarks[bookmarkIndex].smartCategories = finalCategories;
+        bookmarks[bookmarkIndex].smartCategoriesUpdated = new Date().toISOString();
+        bookmarks[bookmarkIndex].smartCategoriesVersion = 1;
+        bookmarks[bookmarkIndex].smartCategoriesConfidence = classificationResult.confidence;
+        bookmarks[bookmarkIndex].lastModified = new Date().toISOString();
+
+        // 保存到存储
+        await chrome.storage.local.set({ bookmarkItems: bookmarks });
+
+        // 更新全局分类配置
+        await updateSmartCategoriesConfig(finalCategories);
+
+        console.log(`书签 "${bookmarks[bookmarkIndex].title}" 智能分类已更新:`, finalCategories);
+
+        return finalCategories;
+    } catch (error) {
+        console.error('更新书签智能分类失败:', error);
+        throw error;
+    }
+}
+
+/**
+ * 更新全局智能分类配置
+ */
+async function updateSmartCategoriesConfig(newCategories) {
+    try {
+        const data = await chrome.storage.local.get('smartCategoriesConfig');
+        const config = data.smartCategoriesConfig || {
+            enabled: true,
+            version: 1,
+            lastBatchUpdate: null,
+            categories: {}
+        };
+
+        // 为新分类创建配置项
+        newCategories.forEach(categoryName => {
+            if (!config.categories[categoryName]) {
+                config.categories[categoryName] = {
+                    count: 0,
+                    keywords: [],
+                    created: new Date().toISOString(),
+                    userModified: false
+                };
+            }
+        });
+
+        // 重新统计所有分类的数量
+        const bookmarksData = await chrome.storage.local.get('bookmarkItems');
+        const bookmarks = bookmarksData.bookmarkItems || [];
+
+        // 重置计数
+        Object.keys(config.categories).forEach(cat => {
+            config.categories[cat].count = 0;
+        });
+
+        // 重新计数
+        bookmarks.forEach(bookmark => {
+            if (bookmark.type === 'bookmark' && bookmark.smartCategories) {
+                bookmark.smartCategories.forEach(category => {
+                    if (config.categories[category]) {
+                        config.categories[category].count++;
+                    }
+                });
+            }
+        });
+
+        // 保存配置
+        await chrome.storage.local.set({ smartCategoriesConfig: config });
+
+    } catch (error) {
+        console.error('更新智能分类配置失败:', error);
+    }
+}
+
+/**
+ * 批量智能分类处理器
+ */
+class SmartCategoryBatchProcessor {
+    constructor() {
+        this.queue = [];
+        this.processing = false;
+        this.progress = { total: 0, completed: 0, failed: 0 };
+        this.currentGeneration = 0;
+    }
+
+    async startBatchClassification(bookmarkIds, mode = 'continue') {
+        if (this.processing) {
+            console.warn('批量分类已在进行中');
+            return;
+        }
+
+        this.queue = [...bookmarkIds];
+        this.progress = { total: bookmarkIds.length, completed: 0, failed: 0 };
+        this.processing = true;
+        this.currentGeneration++;
+
+        const modeText = mode === 'reclassify' ? '重新分类' : '继续分类';
+        console.log(`开始批量智能${modeText}，共 ${bookmarkIds.length} 个书签`);
+
+        // 通知UI开始处理
+        this.notifyProgress();
+
+        try {
+            await this.processBatch();
+        } finally {
+            this.processing = false;
+        }
+    }
+
+    async processBatch() {
+        const BATCH_SIZE = 2; // 并发处理数量，避免API限制
+        const generation = this.currentGeneration;
+
+        while (this.queue.length > 0 && this.processing && generation === this.currentGeneration) {
+            const batch = this.queue.splice(0, BATCH_SIZE);
+
+            console.log(`G${generation}: 处理批次，${batch.length} 个书签`);
+
+            const promises = batch.map(id => this.processBookmark(id, generation));
+            await Promise.allSettled(promises);
+
+            // 更新进度
+            this.progress.completed += batch.length;
+            this.notifyProgress();
+
+            // 避免API限制，添加延迟
+            if (this.queue.length > 0) {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+        }
+
+        console.log(`G${generation}: 批量分类完成，成功: ${this.progress.completed - this.progress.failed}, 失败: ${this.progress.failed}`);
+    }
+
+    async processBookmark(bookmarkId, generation) {
+        try {
+            console.log(`G${generation}: 开始分类书签 ${bookmarkId}`);
+
+            const result = await classifyBookmarkWithAI(bookmarkId);
+            await updateBookmarkSmartCategories(bookmarkId, result);
+
+            console.log(`G${generation}: 书签 ${bookmarkId} 分类完成`);
+            return result;
+        } catch (error) {
+            console.error(`G${generation}: 书签 ${bookmarkId} 分类失败:`, error);
+            this.progress.failed++;
+            throw error;
+        }
+    }
+
+    notifyProgress() {
+        // 发送进度更新消息到UI
+        chrome.runtime.sendMessage({
+            action: 'smartCategoryProgress',
+            progress: this.progress
+        }).catch(() => {
+            // 忽略消息发送失败（可能没有监听器）
+        });
+    }
+
+    stopProcessing() {
+        this.processing = false;
+        this.currentGeneration++;
+        console.log('批量智能分类已停止');
+    }
+}
+
+// 创建全局批量处理器实例
+const smartCategoryBatchProcessor = new SmartCategoryBatchProcessor();
+
+/**
+ * 判断书签是否需要进行智能分类
+ */
+function shouldClassifyBookmark(bookmark) {
+    // 检查智能分类是否启用
+    const isEnabled = true; // 默认启用，后续可以从配置中读取
+
+    if (!isEnabled || !bookmark || bookmark.type !== 'bookmark') {
+        return false;
+    }
+
+    // 如果已经有智能分类且版本是最新的，则不需要重新分类
+    if (bookmark.smartCategories &&
+        bookmark.smartCategories.length > 0 &&
+        bookmark.smartCategoriesVersion >= 1) {
+        return false;
+    }
+
+    // 如果书签刚刚完成AI分析，通常已经包含了智能分类，不需要额外分类
+    if (bookmark.aiStatus === 'completed' &&
+        bookmark.smartCategories &&
+        bookmark.smartCategories.length > 0) {
+        return false;
+    }
+
+    // 需要有基本的内容信息才能进行分类
+    if (!bookmark.title && !bookmark.summary && !bookmark.tags) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * 处理智能分类相关的消息
+ */
+function handleSmartCategoryMessage(message, sender, sendResponse) {
+    switch (message.action) {
+        case 'startSmartCategoryBatch':
+            if (message.bookmarkIds && Array.isArray(message.bookmarkIds)) {
+                const mode = message.mode || 'continue'; // 默认为继续分类模式
+                smartCategoryBatchProcessor.startBatchClassification(message.bookmarkIds, mode)
+                    .then(() => {
+                        sendResponse({ success: true });
+                    })
+                    .catch(error => {
+                        console.error('批量智能分类失败:', error);
+                        sendResponse({ success: false, error: error.message });
+                    });
+                return true; // 异步响应
+            }
+            break;
+
+        case 'stopSmartCategoryBatch':
+            smartCategoryBatchProcessor.stopProcessing();
+            sendResponse({ success: true });
+            break;
+
+        case 'getSmartCategoryProgress':
+            sendResponse({
+                success: true,
+                progress: smartCategoryBatchProcessor.progress,
+                processing: smartCategoryBatchProcessor.processing
+            });
+            break;
+    }
+    return false;
+}
+
+/**
+ * 登录后同步AI配置（禁用缓存版本）
+ * 从服务器获取AI配置，使用禁用缓存的方式避免304问题
  */
 async function syncAIConfigAfterLogin() {
     const token = await getJwt();
@@ -973,14 +1655,17 @@ async function syncAIConfigAfterLogin() {
     }
 
     try {
-        // 1. 获取服务器AI配置
-        const response = await fetch(`${API_BASE_URL}/user/settings/ai-config`, {
-            headers: { 'Authorization': `${token}` }
+        // 使用禁用缓存的请求方式，添加时间戳参数避免304
+        const timestamp = Date.now();
+        const response = await fetch(`${API_BASE_URL}/user/settings/ai-config?withApiKey=true&_=${timestamp}`, {
+            headers: { 'Authorization': `${token}` },
+            cache: 'no-cache' // 明确禁用缓存
         });
 
+        // 处理服务器响应
         if (response.status === 404) {
-            console.log('服务器无AI配置，检查是否需要上传本地配置');
-            await uploadLocalAIConfigIfExists();
+            // 服务器无配置，不做任何操作
+            console.log('服务器无AI配置');
             return;
         }
 
@@ -988,83 +1673,23 @@ async function syncAIConfigAfterLogin() {
             throw new Error(`获取服务器AI配置失败: ${response.status}`);
         }
 
+        // 保存服务器配置到本地
         const serverConfigResponse = await response.json();
         const serverConfig = serverConfigResponse.data || serverConfigResponse;
-
-        console.log('服务器AI配置原始数据:', JSON.stringify(serverConfigResponse, null, 2));
-        console.log('解析后的服务器配置:', JSON.stringify(serverConfig, null, 2));
-
-        // 2. 获取本地AI配置
-        const localData = await chrome.storage.local.get(['aiConfig', 'aiAnalysisDepth']);
-        const localConfig = localData.aiConfig || {};
-
-        console.log('本地AI配置:', localConfig);
-
-        // 3. 时间戳比较
-        const localTime = new Date(localConfig.lastModified || 0);
-        const serverTime = new Date(serverConfig.lastModified || 0);
-
-        console.log('AI配置时间戳比较:', {
-            local: localConfig.lastModified,
-            server: serverConfig.lastModified,
-            localTime: localTime.getTime(),
-            serverTime: serverTime.getTime(),
-            useServer: serverTime > localTime,
-            hasLocalConfig: !!localConfig.provider,
-            hasServerConfig: !!serverConfig.provider,
-            localConfigValid: !!(localConfig.provider && localConfig.apiKey),
-            serverConfigEmpty: Object.keys(serverConfig).length === 0
-        });
-
-        // 特别处理：服务器返回空对象的情况
-        if (Object.keys(serverConfig).length === 0) {
-            console.log('🔍 检测到服务器返回空对象，检查本地配置...');
-            if (localConfig.provider && localConfig.apiKey) {
-                console.log('✅ 本地有有效AI配置，立即上传到服务器');
-                await uploadAIConfigToServer(localConfig, localData.aiAnalysisDepth);
-                return; // 提前返回，避免后续逻辑
-            } else {
-                console.log('❌ 本地也无有效AI配置，跳过同步');
-                return;
-            }
-        }
-
-        if (serverTime > localTime) {
-            // 使用服务器配置（保留本地apiKey）
-            const mergedConfig = {
-                provider: serverConfig.provider,
-                model: serverConfig.model,
-                apiKey: localConfig.apiKey || '', // 保留本地完整apiKey
-                lastModified: serverConfig.lastModified
-            };
-
+        
+        if (serverConfig && serverConfig.provider && serverConfig.apiKey) {
+            // 因为我们请求了完整的apiKey，所以可以直接保存
             await chrome.storage.local.set({
-                aiConfig: mergedConfig,
-                aiAnalysisDepth: localData.aiAnalysisDepth || 'standard'
+                aiConfig: {
+                    provider: serverConfig.provider.toLowerCase(),
+                    model: serverConfig.model,
+                    apiKey: serverConfig.apiKey, // 直接使用从服务器获取的真实apiKey
+                    lastModified: serverConfig.lastModified || new Date().toISOString()
+                }
             });
-
-            console.log('已使用服务器AI配置更新本地');
-        } else if (localTime > serverTime && localConfig.provider) {
-            // 本地配置更新，上传到服务器
-            console.log('本地AI配置更新，上传到服务器');
-            await uploadAIConfigToServer(localConfig, localData.aiAnalysisDepth);
-        } else if (localConfig.provider && localConfig.apiKey && !serverConfig.provider) {
-            // 服务器配置为空但本地有有效配置，上传本地配置
-            console.log('服务器AI配置为空，上传本地配置');
-            await uploadAIConfigToServer(localConfig, localData.aiAnalysisDepth);
-        } else if (localConfig.provider && localConfig.apiKey && (!serverConfig.lastModified || serverConfig.lastModified === localConfig.lastModified)) {
-            // 时间戳相同或服务器无时间戳，但本地有有效配置，上传确保服务器有完整数据
-            console.log('时间戳相同或服务器无时间戳，上传本地配置确保数据完整');
-            await uploadAIConfigToServer(localConfig, localData.aiAnalysisDepth);
+            console.log('已从服务器同步完整的AI配置（包含API Key）到本地');
         } else {
-            console.log('AI配置时间戳比较结果：无需同步');
-
-            // 额外检查：如果本地有配置但服务器配置不完整，强制上传
-            if (localConfig.provider && localConfig.apiKey &&
-                (!serverConfig.provider || !serverConfig.apiKey || serverConfig.apiKey === '********')) {
-                console.log('检测到服务器配置不完整，强制上传本地配置');
-                await uploadAIConfigToServer(localConfig, localData.aiAnalysisDepth);
-            }
+            console.log('从服务器获取的AI配置不完整，跳过本地存储更新');
         }
 
     } catch (error) {
@@ -1144,6 +1769,29 @@ async function uploadAIConfigToServer(config, analysisDepth) {
 // --- All other functions (AI processing, context menus, tab listeners, etc.) remain unchanged ---
 // ... (The rest of the original background.js file from processTaskQueue onwards)
 
+/**
+ * 同步智能分类数据
+ * 在登录后或手动同步时触发，确保智能分类数据与服务器同步
+ */
+async function syncSmartCategories() {
+    console.log("开始同步智能分类数据...");
+    try {
+        // 1. 确保书签数据已同步完成
+        await initiateMergeSync();
+
+        // 2. 通知options页面刷新智能分类UI
+        chrome.runtime.sendMessage({
+            action: 'refreshSmartCategories'
+        });
+
+        console.log("智能分类同步完成");
+        return Promise.resolve({ status: 'success', message: '智能分类同步完成' });
+    } catch (error) {
+        console.error("智能分类同步失败:", error);
+        return Promise.reject({ status: 'error', message: '智能分类同步失败: ' + error.message });
+    }
+}
+
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (!isSidePanelSupported && changeInfo.status === 'complete') {
         const data = await chrome.storage.session.get(tabId.toString());
@@ -1185,15 +1833,36 @@ async function processTaskQueue(generation) {
     isProcessingQueue = true;
     const tasksToRun = taskQueue.splice(0, CONCURRENT_LIMIT);
 
+    // 将任务添加到正在处理集合中
+    tasksToRun.forEach(id => processingTasks.add(id));
+
     console.log(`G${generation}: Processing a batch of ${tasksToRun.length} AI tasks.`);
+
+    // 发送进度更新通知
+    const totalTasks = taskQueue.length + tasksToRun.length;
+    const completedTasks = totalTasks - taskQueue.length - tasksToRun.length;
+    chrome.runtime.sendMessage({
+        action: 'aiQueueProgress',
+        progress: {
+            total: totalTasks,
+            completed: completedTasks,
+            remaining: taskQueue.length + tasksToRun.length,
+            processing: tasksToRun.length
+        }
+    }).catch(() => {
+        // 忽略消息发送失败（可能没有监听器）
+    });
 
     const taskPromises = tasksToRun.map(id => {
         return processBookmarkWithAI(id).catch(e => {
             console.error(`G${generation}: A critical error occurred while processing bookmark ID ${id}:`, e);
         });
     });
-    
+
     await Promise.allSettled(taskPromises);
+
+    // 从正在处理集合中移除已完成的任务
+    tasksToRun.forEach(id => processingTasks.delete(id));
 
     // 关键修复：在继续下一个循环前，再次检查世代编号
     if (generation !== queueGeneration) {
@@ -1201,7 +1870,7 @@ async function processTaskQueue(generation) {
         isProcessingQueue = false;
         return;
     }
-    
+
     console.log(`G${generation}: Finished processing batch.`);
     isProcessingQueue = false;
 
@@ -1308,9 +1977,25 @@ async function processBookmarkWithAI(bookmarkClientId) {
         // --- 内容提取结束，开始AI分析 ---
         
         const enhancedResult = await enhancedCallAI(aiConfig, pageContent, bookmark.url);
-        
+
+        // 处理智能分类（如果AI分析结果中包含）
+        let smartCategoriesData = {};
+        if (enhancedResult.smartCategories && Array.isArray(enhancedResult.smartCategories)) {
+            smartCategoriesData = {
+                smartCategories: enhancedResult.smartCategories,
+                smartCategoriesUpdated: new Date().toISOString(),
+                smartCategoriesVersion: 1,
+                smartCategoriesConfidence: 0.8 // AI分析集成的分类置信度较高
+            };
+            console.log(`书签 "${bookmark.title}" 智能分类已集成:`, enhancedResult.smartCategories);
+
+            // 更新全局分类配置
+            await updateSmartCategoriesConfig(enhancedResult.smartCategories);
+        }
+
         const updatedBookmark = await updateLocalBookmark(bookmark.clientId, {
             ...enhancedResult,
+            ...smartCategoriesData,
             aiStatus: 'completed',
             aiError: ''
         });
@@ -1453,8 +2138,17 @@ async function parseWithOffscreen(html) {
     });
 }
 
-function getAnalysisPrompt(targetLanguage, analysisDepth, contentStats, truncatedContent, url, domain) {
+async function getAnalysisPrompt(targetLanguage, analysisDepth, contentStats, truncatedContent, url, domain) {
     const isChinese = targetLanguage.toLowerCase().includes('chinese');
+
+    // 获取已有的智能分类信息
+    const existingCategories = await getExistingSmartCategories();
+    const categoriesText = existingCategories.length > 0
+        ? existingCategories.map(cat => {
+            const countText = isChinese ? `${cat.count}个书签` : `${cat.count} bookmarks`;
+            return `- ${cat.name} (${countText})`;
+        }).join('\n')
+        : (isChinese ? '- 暂无现有分类' : '- No existing categories');
     
     let promptTemplates = {
         en: {
@@ -1462,14 +2156,32 @@ function getAnalysisPrompt(targetLanguage, analysisDepth, contentStats, truncate
 - "summary": concise summary under 30 words (in English)
 - "category": primary category (in English)
 - "tags": array of 3-5 relevant keywords (in English)
-- "estimatedReadTime": estimated reading time in minutes (number)`,
+- "estimatedReadTime": estimated reading time in minutes (number)
+- "smartCategories": array of 1-3 intelligent categories for this content (in English) - REQUIRED
+
+Existing Smart Categories:
+${categoriesText}
+
+Smart Category Rules:
+1. Prioritize selecting 1-3 most matching categories from existing categories
+2. If existing categories are not suitable, create 1 new category (2-6 words)
+3. New category names should be concise and clear, avoiding duplication or similarity with existing categories`,
             standard: `Analyze this content and provide a JSON with ALL required fields:
 - "summary": concise summary under 50 words (in English) - REQUIRED, never empty
 - "category": primary category (in English) - REQUIRED, never empty
 - "tags": array of 3-6 relevant keywords/tags (in English) - REQUIRED, must contain at least 3 tags
 - "contentType": type of content (MUST be one of: article, tutorial, news, reference, tool, entertainment, blog, documentation)
 - "readingLevel": estimated reading difficulty (MUST be one of: beginner, intermediate, advanced)
-- "estimatedReadTime": estimated reading time in minutes (number)`,
+- "estimatedReadTime": estimated reading time in minutes (number)
+- "smartCategories": array of 1-3 intelligent categories for this content (in English) - REQUIRED
+
+Existing Smart Categories:
+${categoriesText}
+
+Smart Category Rules:
+1. Prioritize selecting 1-3 most matching categories from existing categories
+2. If existing categories are not suitable, create 1 new category (2-6 words)
+3. New category names should be concise and clear, avoiding duplication or similarity with existing categories`,
             detailed: `Perform detailed analysis and provide a comprehensive JSON with:
 - "summary": detailed summary under 100 words (in English)
 - "category": primary category (in English)
@@ -1478,21 +2190,48 @@ function getAnalysisPrompt(targetLanguage, analysisDepth, contentStats, truncate
 - "readingLevel": estimated reading difficulty (MUST be one of: beginner, intermediate, advanced)
 - "keyPoints": array of 3-5 key takeaways (in English)
 - "sentiment": overall sentiment (MUST be one of: positive, neutral, negative)
-- "estimatedReadTime": estimated reading time in minutes (number)`
+- "estimatedReadTime": estimated reading time in minutes (number)
+- "smartCategories": array of 1-3 intelligent categories for this content (in English) - REQUIRED
+
+Existing Smart Categories:
+${categoriesText}
+
+Smart Category Rules:
+1. Prioritize selecting 1-3 most matching categories from existing categories
+2. If existing categories are not suitable, create 1 new category (2-6 words)
+3. New category names should be concise and clear, avoiding duplication or similarity with existing categories`
         },
         zh_CN: {
             basic: `分析此内容并提供一个基础JSON，包含：
 - "summary": 简洁的摘要，30字以内 (使用简体中文)
 - "category": 主要分类 (使用简体中文)
 - "tags": 3-5个相关关键词的数组 (使用简体中文)
-- "estimatedReadTime": 估算的阅读时间（分钟，数字）`,
+- "estimatedReadTime": 估算的阅读时间（分钟，数字）
+- "smartCategories": 1-3个智能分类的数组 (使用简体中文) - 必填
+
+已有智能分类列表：
+${categoriesText}
+
+智能分类规则：
+1. 优先从已有分类中选择1-3个最匹配的分类
+2. 如果已有分类都不合适，可以创建1个新分类（2-6个字）
+3. 新分类名称要简洁明确，避免与已有分类重复或过于相似`,
             standard: `分析此内容并提供一个包含所有必填字段的JSON：
 - "summary": 简洁的摘要，50字以内 (使用简体中文) - 必填
 - "category": 主要分类 (使用简体中文) - 必填
 - "tags": 3-6个相关关键词/标签的数组 (使用简体中文) - 必填
 - "contentType": 内容类型 (必须是以下之一: article, tutorial, news, reference, tool, entertainment, blog, documentation)
 - "readingLevel": 阅读难度评估 (必须是以下之一: beginner, intermediate, advanced)
-- "estimatedReadTime": 估算的阅读时间（分钟，数字）`,
+- "estimatedReadTime": 估算的阅读时间（分钟，数字）
+- "smartCategories": 1-3个智能分类的数组 (使用简体中文) - 必填
+
+已有智能分类列表：
+${categoriesText}
+
+智能分类规则：
+1. 优先从已有分类中选择1-3个最匹配的分类
+2. 如果已有分类都不合适，可以创建1个新分类（2-6个字）
+3. 新分类名称要简洁明确，避免与已有分类重复或过于相似`,
             detailed: `对此内容进行详细分析，并提供一个全面的JSON，包含：
 - "summary": 详细的摘要，100字以内 (使用简体中文)
 - "category": 主要分类 (使用简体中文)
@@ -1501,7 +2240,16 @@ function getAnalysisPrompt(targetLanguage, analysisDepth, contentStats, truncate
 - "readingLevel": 阅读难度评估 (必须是以下之一: beginner, intermediate, advanced)
 - "keyPoints": 3-5个关键要点的数组 (使用简体中文)
 - "sentiment": 整体情绪 (必须是以下之一: positive, neutral, negative)
-- "estimatedReadTime": 估算的阅读时间（分钟，数字）`
+- "estimatedReadTime": 估算的阅读时间（分钟，数字）
+- "smartCategories": 1-3个智能分类的数组 (使用简体中文) - 必填
+
+已有智能分类列表：
+${categoriesText}
+
+智能分类规则：
+1. 优先从已有分类中选择1-3个最匹配的分类
+2. 如果已有分类都不合适，可以创建1个新分类（2-6个字）
+3. 新分类名称要简洁明确，避免与已有分类重复或过于相似`
         }
     };
     const requirements = {
@@ -1521,13 +2269,13 @@ async function callAI(aiConfig, prompt) {
     let maxTokens = prompt.includes('recommendations') ? 1500 : 800;
 
     const commonBodyParams = { max_tokens: maxTokens, temperature: 0.2 };
-    if (aiConfig.provider === 'openai') {
+    if (aiConfig.provider.toLowerCase() === 'openai') {
         apiUrl = 'https://api.openai.com/v1/chat/completions';
         body = { model: aiConfig.model, messages: [{ role: 'user', content: prompt }], response_format: { type: "json_object" }, ...commonBodyParams };
-    } else if (aiConfig.provider === 'deepseek') {
+    } else if (aiConfig.provider.toLowerCase() === 'deepseek') {
         apiUrl = 'https://api.deepseek.com/v1/chat/completions';
         body = { model: aiConfig.model, messages: [{ role: 'user', content: prompt }], ...commonBodyParams };
-    } else if (aiConfig.provider === 'openrouter') {
+    } else if (aiConfig.provider.toLowerCase() === 'openrouter') {
         apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
         headers['HTTP-Referer'] = 'https://github.com/CaspianLight/Smart-Bookmarker';
         headers['X-Title'] = 'Smart Bookmarker';
@@ -1556,7 +2304,7 @@ async function enhancedCallAI(aiConfig, content, url) {
     const truncatedContent = content.substring(0, contentLength);
     let domain = 'unknown'; try { domain = new URL(url).hostname.replace('www.', ''); } catch (e) {}
 
-    const finalPrompt = getAnalysisPrompt(targetLanguage, aiAnalysisDepth, { wordCount, charCount, chineseCharCount }, truncatedContent, url, domain);
+    const finalPrompt = await getAnalysisPrompt(targetLanguage, aiAnalysisDepth, { wordCount, charCount, chineseCharCount }, truncatedContent, url, domain);
     const response = await callAIWithRetry(aiConfig, finalPrompt);
     return parseEnhancedAIResponse(response, content);
 }
@@ -1595,7 +2343,8 @@ function parseEnhancedAIResponse(text, content = '') {
                 readingLevel: validLevels.includes(parsed.readingLevel?.toLowerCase()) ? parsed.readingLevel.toLowerCase() : 'intermediate',
                 keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints.map(p => p.trim()).filter(Boolean) : [],
                 sentiment: validSentiments.includes(parsed.sentiment?.toLowerCase()) ? parsed.sentiment.toLowerCase() : 'neutral',
-                estimatedReadTime: typeof parsed.estimatedReadTime === 'number' ? Math.max(1, Math.min(120, parsed.estimatedReadTime)) : calculateEstimatedReadTime(content)
+                estimatedReadTime: typeof parsed.estimatedReadTime === 'number' ? Math.max(1, Math.min(120, parsed.estimatedReadTime)) : calculateEstimatedReadTime(content),
+                smartCategories: Array.isArray(parsed.smartCategories) ? parsed.smartCategories.map(c => c.trim()).filter(Boolean) : []
             };
 
             if (!result.summary) result.summary = chrome.i18n.getMessage('aiSummaryFailedFallback');
@@ -1620,7 +2369,7 @@ function calculateEstimatedReadTime(content) {
 }
 
 function getDefaultAnalysisResult(content = '') {
-    return { summary: '', category: '', tags: [], contentType: 'article', readingLevel: 'intermediate', keyPoints: [], sentiment: 'neutral', estimatedReadTime: calculateEstimatedReadTime(content) };
+    return { summary: '', category: '', tags: [], contentType: 'article', readingLevel: 'intermediate', keyPoints: [], sentiment: 'neutral', estimatedReadTime: calculateEstimatedReadTime(content), smartCategories: [] };
 }
 
 function extractMetaInfo(html) {
@@ -1748,6 +2497,7 @@ async function forceRestartAiQueue() {
 
     isProcessingQueue = false;
     taskQueue = [];
+    processingTasks.clear(); // 清理正在处理的任务集合
     
     const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
 
@@ -1797,3 +2547,39 @@ async function forceRestartAiQueue() {
 
     return taskQueue.length;
 }
+
+// --- 微信登录回调监听 ---
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    // 检查URL是否包含微信登录回调参数
+    if (changeInfo.url && (
+        changeInfo.url.includes('https://ndhheadipdbndapphbcjekkpcgcnnjno.chromiumapp.org/') ||
+        changeInfo.url.includes('https://bookmarker-api.aiwetalk.com/')
+    )) {
+        console.log('检测到微信登录回调URL:', changeInfo.url);
+
+        // 检查是否包含token或error参数
+        const url = new URL(changeInfo.url);
+        const token = url.searchParams.get('token');
+        const userId = url.searchParams.get('userId');
+        const error = url.searchParams.get('error');
+
+        console.log('回调参数检查 - token:', token, 'userId:', userId, 'error:', error);
+
+        if (token || error) {
+            console.log('微信登录回调包含认证信息，发送到options页面');
+
+            // 发送消息到options页面
+            chrome.runtime.sendMessage({
+                type: 'wechat_login_callback',
+                url: changeInfo.url
+            }).catch(err => {
+                console.log('发送微信登录回调消息失败，可能options页面未打开:', err);
+            });
+
+            // 关闭回调标签页
+            chrome.tabs.remove(tabId).catch(err => {
+                console.log('关闭回调标签页失败:', err);
+            });
+        }
+    }
+});

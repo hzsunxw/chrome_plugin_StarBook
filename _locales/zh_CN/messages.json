@@ -442,6 +442,10 @@
     "message": "使用 GitHub 登录",
     "description": "GitHub社交登录的按钮文本。"
   },
+  "loginWithWechat": {
+    "message": "使用微信登录",
+    "description": "微信社交登录的按钮文本。"
+  },
   "importingBookmarks": {
     "message": "正在导入书签，请稍候...",
     "description": "书签导入期间显示的加载信息。"
@@ -637,5 +641,152 @@
     "placeholders": {
       "pageContent": { "content": "$1" }
     }
+  },
+  "myFolders": {
+    "message": "我的文件夹",
+    "description": "侧边栏中文件夹区域的标题。"
+  },
+  "smartCategories": {
+    "message": "智能分类",
+    "description": "侧边栏中智能分类区域的标题。"
+  },
+  "continueAnalysis": {
+    "message": "继续分析未完成的书签",
+    "description": "继续分析按钮的工具提示。"
+  },
+  "reanalysis": {
+    "message": "重新分析所有书签",
+    "description": "重新分析按钮的工具提示。"
+  },
+  "smartCategoriesLabel": {
+    "message": "智能分类",
+    "description": "书签列表中智能分类区域的标签。"
+  },
+  "smartCategoryFilter": {
+    "message": "智能分类: ${category}",
+    "description": "按智能分类筛选时的标题。"
+  },
+  "confidenceTooltip": {
+    "message": "AI分类置信度：表示人工智能对这个分类结果的信心程度。85%表示AI有85%的把握认为这个分类是正确的。置信度越高，分类越可靠。",
+    "description": "智能分类置信度徽章的工具提示说明。"
+  },
+  "noSmartCategories": {
+    "message": "暂无智能分类",
+    "description": "智能分类为空时显示的消息。"
+  },
+  "enableSmartCategories": {
+    "message": "启用智能分类",
+    "description": "启用智能分类按钮的文本。"
+  },
+  "smartCategoriesEnabled": {
+    "message": "智能分类已启用",
+    "description": "智能分类启用成功的提示消息。"
+  },
+  "smartCategoriesEnableFailed": {
+    "message": "启用智能分类失败",
+    "description": "智能分类启用失败的提示消息。"
+  },
+  "smartCategoriesComplete": {
+    "message": "智能分类完成！成功分类 ${count} 个书签",
+    "description": "智能分类完成的提示消息。",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "smartCategoriesLoaded": {
+    "message": "智能分类加载完成",
+    "description": "智能分类加载完成的日志消息。"
+  },
+  "smartCategoriesLoadFailed": {
+    "message": "加载智能分类失败",
+    "description": "智能分类加载失败的日志消息。"
+  },
+  "aiConfigRequired": {
+    "message": "请先在设置页面配置AI服务（OpenAI、DeepSeek或OpenRouter）",
+    "description": "需要AI配置的提示消息。"
+  },
+  "showStarredInNewtab": {
+    "message": "在新标签页显示标星书签",
+    "description": "用于启用在新标签页显示标星书签的切换开关标签。"
+  },
+  "noStarredBookmarks": {
+    "message": "暂无标星书签",
+    "description": "没有标星书签时显示的消息。"
+  },
+  "noStarredBookmarksDesc": {
+    "message": "您还没有将任何书签标记为星标",
+    "description": "没有标星书签时的描述消息。"
+  },
+  "loadError": {
+    "message": "加载失败",
+    "description": "加载书签失败时的错误标题。"
+  },
+  "loadErrorDesc": {
+    "message": "无法加载书签数据，请检查扩展设置",
+    "description": "加载书签失败时的错误描述。"
+  },
+  "starredBookmarksHidden": {
+    "message": "标星书签已隐藏",
+    "description": "标星书签被隐藏时显示的消息。"
+  },
+  "starredBookmarksHiddenDesc": {
+    "message": "您已在设置中关闭了\"在新标签页显示标星书签\"选项",
+    "description": "标星书签被隐藏时的描述消息。"
+  },
+  "sendVerificationCode": {
+    "message": "发送验证码",
+    "description": "发送验证码到邮箱的按钮文本。"
+  },
+  "verifyCode": {
+    "message": "验证验证码",
+    "description": "验证验证码的按钮文本。"
+  },
+  "resendCode": {
+    "message": "重新发送验证码",
+    "description": "重新发送验证码的按钮文本。"
+  },
+  "resendCountdown": {
+    "message": "重新发送({seconds}秒)",
+    "description": "倒计时期间重新发送按钮的文本。"
+  },
+  "completeRegistration": {
+    "message": "完成注册",
+    "description": "验证后完成注册的按钮文本。"
+  },
+  "verificationCodePlaceholder": {
+    "message": "请输入6位验证码",
+    "description": "验证码输入框的占位符。"
+  },
+  "confirmPasswordPlaceholder": {
+    "message": "确认密码",
+    "description": "密码确认输入框的占位符。"
+  },
+  "login": {
+    "message": "登录",
+    "description": "用户登录的按钮文本。"
+  },
+  "verificationCodeSent": {
+    "message": "验证码已发送到您的邮箱",
+    "description": "验证码发送后显示的消息。"
+  },
+  "emailVerified": {
+    "message": "邮箱验证成功",
+    "description": "邮箱验证成功后显示的消息。"
+  },
+  "verificationCodeExpired": {
+    "message": "验证码已过期",
+    "description": "验证码过期的错误消息。"
+  },
+  "verificationCodeIncorrect": {
+    "message": "验证码错误",
+    "description": "验证码错误的错误消息。"
+  },
+  "emailAlreadyRegistered": {
+    "message": "邮箱已被注册",
+    "description": "邮箱已被注册时的错误消息。"
+  },
+  "emailNotVerified": {
+    "message": "邮箱未验证，请先验证您的邮箱",
+    "description": "邮箱未验证时的错误消息。"
   }
 }

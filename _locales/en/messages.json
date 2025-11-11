@@ -442,6 +442,10 @@
     "message": "Login with GitHub",
     "description": "Button text for GitHub social login."
   },
+  "loginWithWechat": {
+    "message": "Login with WeChat",
+    "description": "Button text for WeChat social login."
+  },
   "importingBookmarks": {
     "message": "Importing bookmarks, please wait...",
     "description": "Loading message shown during bookmark import."
@@ -637,5 +641,136 @@
     "placeholders": {
       "pageContent": { "content": "$1" }
     }
+  },
+  "myFolders": {
+    "message": "My Folders",
+    "description": "Title for the folders section in the sidebar."
+  },
+  "smartCategories": {
+    "message": "Smart Categories",
+    "description": "Title for the smart categories section in the sidebar."
+  },
+  "continueAnalysis": {
+    "message": "Continue analyzing unfinished bookmarks",
+    "description": "Tooltip for the continue analysis button."
+  },
+  "reanalysis": {
+    "message": "Re-analyze all bookmarks",
+    "description": "Tooltip for the re-analysis button."
+  },
+  "smartCategoriesLabel": {
+    "message": "Smart Categories",
+    "description": "Label for smart categories section in bookmark list."
+  },
+  "smartCategoryFilter": {
+    "message": "Smart Category: ${category}",
+    "description": "Title when filtering by smart category."
+  },
+  "confidenceTooltip": {
+    "message": "AI Classification Confidence: Indicates how confident the AI is about this classification result. 85% means the AI is 85% sure this classification is correct. Higher confidence means more reliable classification.",
+    "description": "Tooltip explanation for smart category confidence badge."
+  },
+  "noSmartCategories": {
+    "message": "No smart categories yet",
+    "description": "Message displayed when smart categories are empty."
+  },
+  "enableSmartCategories": {
+    "message": "Enable Smart Categories",
+    "description": "Text for the enable smart categories button."
+  },
+  "smartCategoriesEnabled": {
+    "message": "Smart categories enabled",
+    "description": "Success message when smart categories are enabled."
+  },
+  "smartCategoriesEnableFailed": {
+    "message": "Failed to enable smart categories",
+    "description": "Error message when smart categories fail to enable."
+  },
+  "smartCategoriesComplete": {
+    "message": "Smart categorization complete! Successfully categorized ${count} bookmarks",
+    "description": "Completion message for smart categorization.",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "smartCategoriesLoaded": {
+    "message": "Smart categories loaded successfully",
+    "description": "Log message for successful smart categories loading."
+  },
+  "smartCategoriesLoadFailed": {
+    "message": "Failed to load smart categories",
+    "description": "Log message for smart categories loading failure."
+  },
+  "aiConfigRequired": {
+    "message": "Please configure AI service (OpenAI, DeepSeek, or OpenRouter) in settings first",
+    "description": "Message prompting user to configure AI service."
+  },
+  "showStarredInNewtab": {
+    "message": "Show starred bookmarks in new tab",
+    "description": "Label for the toggle switch to enable showing starred bookmarks in new tab page."
+  },
+  "starredBookmarksHidden": {
+    "message": "Starred bookmarks hidden",
+    "description": "Message shown when starred bookmarks are hidden."
+  },
+  "starredBookmarksHiddenDesc": {
+    "message": "You have disabled \"Show starred bookmarks in new tab\" option in settings",
+    "description": "Description message when starred bookmarks are hidden."
+  },
+  "sendVerificationCode": {
+    "message": "Send Verification Code",
+    "description": "Button text to send verification code to email."
+  },
+  "verifyCode": {
+    "message": "Verify Code",
+    "description": "Button text to verify the code."
+  },
+  "resendCode": {
+    "message": "Resend Code",
+    "description": "Button text to resend verification code."
+  },
+  "resendCountdown": {
+    "message": "Resend ({seconds}s)",
+    "description": "Button text when resend is in cooldown with countdown."
+  },
+  "completeRegistration": {
+    "message": "Complete Registration",
+    "description": "Button text to complete registration after verification."
+  },
+  "verificationCodePlaceholder": {
+    "message": "Enter 6-digit verification code",
+    "description": "Placeholder for verification code input."
+  },
+  "confirmPasswordPlaceholder": {
+    "message": "Confirm password",
+    "description": "Placeholder for password confirmation input."
+  },
+  "login": {
+    "message": "Login",
+    "description": "Button text for user login."
+  },
+  "verificationCodeSent": {
+    "message": "Verification code has been sent to your email",
+    "description": "Message shown after verification code is sent."
+  },
+  "emailVerified": {
+    "message": "Email verified successfully",
+    "description": "Message shown after email verification."
+  },
+  "verificationCodeExpired": {
+    "message": "Verification code has expired",
+    "description": "Error message for expired verification code."
+  },
+  "verificationCodeIncorrect": {
+    "message": "Incorrect verification code",
+    "description": "Error message for incorrect verification code."
+  },
+  "emailAlreadyRegistered": {
+    "message": "Email is already registered",
+    "description": "Error message when email is already registered."
+  },
+  "emailNotVerified": {
+    "message": "Email not verified. Please verify your email first.",
+    "description": "Error message when email is not verified."
   }
 }

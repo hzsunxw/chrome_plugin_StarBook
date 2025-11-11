@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(openspec list --specs)",
+      "Bash(openspec validate add-email-registration --strict)",
+      "Bash(openspec show:*)",
+      "Bash(openspec archive add-email-registration:*)",
+      "Bash(openspec validate:*)",
+      "Bash(openspec list)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

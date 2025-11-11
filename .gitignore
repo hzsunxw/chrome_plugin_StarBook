@@ -1,3 +1,10 @@
 test*.*
 debug*.*
+*.md
+smart*.*
+ui-*.*
+ai-*.*
+folder-toggle-fix.html
+i18n-fix-verification.html
 server/
+openspec/

@@ -17,12 +17,321 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// ===== 智能分类管理器类定义 =====
+/**
+ * 智能分类管理器类
+ */
+class SmartCategoryManager {
+  constructor(i18n) {
+    this.categories = new Map();
+    this.isEnabled = false;
+    this.isProcessing = false;
+    this.i18n = i18n;
+  }
+
+  async init() {
+    await this.loadSmartCategories();
+    this.bindEvents();
+    this.renderSmartCategories();
+
+    // 监听来自background的进度更新
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.action === 'aiQueueProgress') {
+        this.updateProgress(message.progress);
+      } else if (message.action === 'smartCategoryProgress') {
+        // 兼容旧的智能分类进度消息
+        this.updateProgress(message.progress);
+      }
+    });
+  }
+
+  async loadSmartCategories() {
+    try {
+      const data = await chrome.storage.local.get(['smartCategoriesConfig', 'bookmarkItems']);
+      const config = data.smartCategoriesConfig || { enabled: true, categories: {} };
+      const bookmarks = data.bookmarkItems || [];
+
+      this.isEnabled = config.enabled;
+
+      // 从书签数据中统计分类
+      this.categories.clear();
+      bookmarks.forEach(bookmark => {
+        if (bookmark.type === 'bookmark' && bookmark.smartCategories) {
+          bookmark.smartCategories.forEach(category => {
+            if (!this.categories.has(category)) {
+              this.categories.set(category, {
+                name: category,
+                count: 0,
+                bookmarkIds: []
+              });
+            }
+            const cat = this.categories.get(category);
+            cat.count++;
+            cat.bookmarkIds.push(bookmark.clientId || bookmark.serverId);
+          });
+        }
+      });
+
+      console.log(this.i18n.get('smartCategoriesLoaded'), this.categories.size);
+    } catch (error) {
+      console.error(this.i18n.get('smartCategoriesLoadFailed'), error);
+    }
+  }
+
+  renderSmartCategories() {
+    const container = document.getElementById('smart-categories-content');
+    if (!container) return;
+
+    if (!this.isEnabled || this.categories.size === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <p>${this.i18n.get('noSmartCategories')}</p>
+          <button id="enableSmartCategoryBtn" class="btn-primary">${this.i18n.get('enableSmartCategories')}</button>
+        </div>
+      `;
+
+      // 绑定启用按钮事件
+      const enableBtn = document.getElementById('enableSmartCategoryBtn');
+      if (enableBtn) {
+        enableBtn.addEventListener('click', () => this.enableSmartCategory());
+      }
+      return;
+    }
+
+    const categoriesArray = Array.from(this.categories.values())
+      .sort((a, b) => b.count - a.count);
+
+    container.innerHTML = categoriesArray.map(category => `
+      <div class="category-item" data-category="${category.name}">
+        <span class="category-name">${category.name}</span>
+        <span class="category-count">[${category.count}]</span>
+      </div>
+    `).join('');
+
+    // 绑定点击事件
+    container.querySelectorAll('.category-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const categoryName = e.currentTarget.dataset.category;
+        this.filterByCategory(categoryName);
+      });
+    });
+  }
+
+  async filterByCategory(categoryName) {
+    const category = this.categories.get(categoryName);
+    if (!category) return;
+
+    // 高亮选中的分类
+    document.querySelectorAll('.category-item').forEach(item => {
+      item.classList.remove('active');
+    });
+    document.querySelector(`[data-category="${categoryName}"]`)?.classList.add('active');
+
+    // 过滤显示书签
+    const bookmarks = await this.getBookmarksByIds(category.bookmarkIds);
+    this.displayFilteredBookmarks(bookmarks, this.i18n.get('smartCategoryFilter', { category: categoryName }));
+  }
+
+  async getBookmarksByIds(bookmarkIds) {
+    try {
+      const data = await chrome.storage.local.get('bookmarkItems');
+      const allBookmarks = data.bookmarkItems || [];
+
+      return allBookmarks.filter(bookmark =>
+        bookmarkIds.includes(bookmark.clientId) || bookmarkIds.includes(bookmark.serverId)
+      );
+    } catch (error) {
+      console.error('获取书签失败:', error);
+      return [];
+    }
+  }
+
+  displayFilteredBookmarks(bookmarks, title) {
+    // 调用全局的renderBookmarkList函数
+    if (window.renderBookmarkList) {
+      window.renderBookmarkList(null, bookmarks, title);
+    }
+  }
+
+  bindEvents() {
+    // 继续分析按钮
+    const continueBtn = document.getElementById('continueAnalysisBtn');
+    if (continueBtn) {
+      continueBtn.addEventListener('click', () => this.startBatchAnalysis('continue'));
+    }
+
+    // 重新分析按钮
+    const reanalysisBtn = document.getElementById('reanalysisBtn');
+    if (reanalysisBtn) {
+      reanalysisBtn.addEventListener('click', () => this.startBatchAnalysis('reanalysis'));
+    }
+
+    // 分类设置按钮已移除
+  }
+
+  async enableSmartCategory() {
+    try {
+      // 检查AI配置
+      const { aiConfig } = await chrome.storage.local.get("aiConfig");
+      if (!aiConfig || !aiConfig.apiKey) {
+        if (window.showToast) {
+          window.showToast(this.i18n.get('aiConfigRequired'), 5000, '#f44336');
+        }
+        return;
+      }
+
+      console.log('AI配置检查通过，提供商:', aiConfig.provider);
+
+      // 启用智能分类
+      const config = {
+        enabled: true,
+        version: 1,
+        lastBatchUpdate: null,
+        categories: {}
+      };
+
+      await chrome.storage.local.set({ smartCategoriesConfig: config });
+      this.isEnabled = true;
+
+      // 开始批量分析（继续分析模式）
+      await this.startBatchAnalysis('continue');
+
+    } catch (error) {
+      console.error(this.i18n.get('smartCategoriesLoadFailed'), error);
+      if (window.showToast) {
+        window.showToast(this.i18n.get('smartCategoriesEnableFailed'), 3000, '#f44336');
+      }
+    }
+  }
+
+  async startBatchAnalysis(mode = 'continue') {
+    try {
+      const data = await chrome.storage.local.get('bookmarkItems');
+      const bookmarks = data.bookmarkItems || [];
+
+      let targetBookmarks = [];
+      let modeText = '';
+
+      if (mode === 'reanalysis') {
+        // 重新分析模式：处理所有书签，重置AI状态
+        targetBookmarks = bookmarks.filter(bookmark => bookmark.type === 'bookmark');
+        modeText = '重新分析';
+
+        // 重置AI分析状态，让系统重新进行完整分析（包括分类）
+        targetBookmarks.forEach(bookmark => {
+          bookmark.aiStatus = 'pending';
+          bookmark.aiError = '';
+          // 清空所有AI生成的内容，让系统重新生成
+          bookmark.summary = '';
+          bookmark.tags = [];
+          bookmark.smartCategories = [];
+          bookmark.smartCategoriesUpdated = null;
+          bookmark.smartCategoriesVersion = 0;
+          bookmark.smartCategoriesConfidence = null;
+          bookmark.contentType = '';
+          bookmark.readingLevel = '';
+          bookmark.estimatedReadTime = null;
+          bookmark.keyPoints = [];
+        });
+
+        // 保存重置后的数据
+        await chrome.storage.local.set({ bookmarkItems: bookmarks });
+
+      } else {
+        // 继续分析模式：只处理未完成分析的书签
+        targetBookmarks = bookmarks.filter(bookmark =>
+          bookmark.type === 'bookmark' &&
+          (['pending', 'processing', 'failed'].includes(bookmark.aiStatus) ||
+           (bookmark.aiStatus === 'completed' && (!bookmark.summary || !bookmark.tags || bookmark.tags.length === 0)))
+        );
+        modeText = '继续分析';
+      }
+
+      if (targetBookmarks.length === 0) {
+        const message = mode === 'reanalysis' ? '没有书签需要重新分析' : '所有书签都已分析完成';
+        if (window.showToast) {
+          window.showToast(message);
+        }
+        return;
+      }
+
+      console.log(`开始批量AI${modeText}，共 ${targetBookmarks.length} 个书签`);
+
+      // 显示进度条
+      this.showProgress(true);
+      this.isProcessing = true;
+
+      // 发送批量分析请求到background（复用现有的AI队列系统）
+      chrome.runtime.sendMessage({
+        action: 'forceRestartAiQueue'
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('发送批量分析请求失败:', chrome.runtime.lastError);
+          this.showProgress(false);
+          this.isProcessing = false;
+          if (window.showToast) {
+            window.showToast('启动AI分析失败', 3000, '#f44336');
+          }
+        } else {
+          console.log(`AI分析队列已重启，处理 ${response.restartedCount} 个书签`);
+          if (window.showToast) {
+            window.showToast(`开始AI分析 ${response.restartedCount} 个书签`);
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('启动批量分析失败:', error);
+      this.showProgress(false);
+      this.isProcessing = false;
+      if (window.showToast) {
+        window.showToast('启动AI分析失败', 3000, '#f44336');
+      }
+    }
+  }
+
+  showProgress(show) {
+    const progressContainer = document.getElementById('classification-progress');
+    if (progressContainer) {
+      progressContainer.style.display = show ? 'block' : 'none';
+    }
+  }
+
+  updateProgress(progress) {
+    const progressFill = document.querySelector('.progress-fill');
+    const progressText = document.getElementById('progress-count');
+
+    if (progressFill && progressText) {
+      const percentage = progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
+      progressFill.style.width = `${percentage}%`;
+      progressText.textContent = `${progress.completed}/${progress.total}`;
+
+      if (progress.completed === progress.total) {
+        setTimeout(() => {
+          this.showProgress(false);
+          this.isProcessing = false;
+          this.loadSmartCategories().then(() => {
+            this.renderSmartCategories();
+            const successCount = progress.completed - progress.failed;
+            if (window.showToast) {
+              window.showToast(this.i18n.get('smartCategoriesComplete', { count: successCount }));
+            }
+          });
+        }, 1000);
+      }
+    }
+  }
+
+  // showCategorySettings方法已移除
+}
+
 function initOptions(i18n, currentLang) {
   // --- App State ---
   let allItems = [];
   let activeFolderId = 'root';
   let contextMenuFolderId = null; // To store the ID of the right-clicked folder
   let currentEditingBookmarkId = null; // <-- Add this variable
+  let smartCategoryManager = null; // 智能分类管理器
 
   const langKey = currentLang.startsWith('zh') ? 'zh_CN' : 'en';
 
@@ -223,6 +532,77 @@ function initOptions(i18n, currentLang) {
   loadAIConfig();
   loadLanguageSetting();
   chrome.storage.onChanged.addListener(handleStorageChange);
+
+  // 初始化智能分类管理器
+  smartCategoryManager = new SmartCategoryManager(i18n);
+  smartCategoryManager.init();
+
+  // 添加全局消息监听器，处理来自background的智能分类刷新请求
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.action === 'refreshSmartCategories') {
+      if (smartCategoryManager) {
+        smartCategoryManager.loadSmartCategories().then(() => {
+          smartCategoryManager.renderSmartCategories();
+        });
+      }
+    }
+  });
+
+  // 暴露函数给智能分类管理器使用
+  window.renderBookmarkList = renderBookmarkList;
+  window.showToast = showToast;
+
+  // 初始化新标签页切换开关
+  function initNewTabToggle() {
+    const newtabToggle = document.getElementById('newtabToggle');
+    if (!newtabToggle) return;
+
+    // Load the current setting from storage
+    chrome.storage.local.get('showStarredInNewtab', (data) => {
+        const isEnabled = data.showStarredInNewtab !== false; // default to true if not set
+        newtabToggle.checked = isEnabled;
+    });
+
+    // Add event listener to save setting when toggled
+    newtabToggle.addEventListener('change', (event) => {
+        const isEnabled = event.target.checked;
+        chrome.storage.local.set({ showStarredInNewtab: isEnabled }, () => {
+            if (chrome.runtime.lastError) {
+                console.error('Failed to save newtab setting:', chrome.runtime.lastError);
+            } else {
+                console.log('Newtab setting saved:', isEnabled);
+            }
+        });
+    });
+  }
+
+  initNewTabToggle();
+
+  // 绑定文件夹折叠事件
+  const foldersHeader = document.getElementById('folders-header');
+  if (foldersHeader) {
+    foldersHeader.addEventListener('click', () => toggleFolderSection());
+  }
+
+  // 定义文件夹折叠功能
+  function toggleFolderSection() {
+    const header = document.querySelector('.folder-section .section-header');
+    const content = document.querySelector('.folder-section .section-content');
+    const toggleIcon = header?.querySelector('.toggle-icon');
+
+    if (header && content && toggleIcon) {
+      content.classList.toggle('collapsed');
+
+      // 更新切换图标
+      if (content.classList.contains('collapsed')) {
+        toggleIcon.textContent = '▶';
+      } else {
+        toggleIcon.textContent = '▼';
+      }
+    }
+  }
+
+  // 文件夹折叠功能已定义为本地函数
   
   // --- Main Functions ---
   function loadAllItems() {
@@ -236,11 +616,36 @@ function initOptions(i18n, currentLang) {
 
       renderFolderTree();
       renderBookmarkList(activeFolderId);
+
+      // 检查是否有卡住的AI任务，如果有则自动恢复
+      const stuckItems = allItems.filter(item => 
+        item.type === 'bookmark' && (item.aiStatus === 'pending' || item.aiStatus === 'processing')
+      );
+      
+      if (stuckItems.length > 0) {
+        console.log(`检测到 ${stuckItems.length} 个卡住的AI任务，正在自动恢复...`);
+        chrome.runtime.sendMessage({ action: "recoverStuckTasks" }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error('发送恢复任务请求失败:', chrome.runtime.lastError);
+          } else {
+            console.log('AI任务恢复已启动');
+          }
+        });
+      }
     });
   }
 
   function renderFolderTree() {
-    folderTreeContainer.innerHTML = '';
+    // 渲染到新的文件夹内容区域
+    let targetContainer = document.getElementById('folders-content');
+    if (!targetContainer) {
+      // 如果新结构不存在，回退到原有方式
+      folderTreeContainer.innerHTML = '';
+      targetContainer = folderTreeContainer;
+    } else {
+      targetContainer.innerHTML = '';
+    }
+
     const tree = document.createElement('div');
     tree.className = 'folder-tree';
 
@@ -285,20 +690,21 @@ function initOptions(i18n, currentLang) {
         return ul;
     };
     tree.appendChild(buildTree('root', 0));
-    folderTreeContainer.appendChild(tree);
 
-    const activeEl = folderTreeContainer.querySelector(`.tree-item[data-id="${activeFolderId}"]`);
+    // 添加到目标容器
+    targetContainer.appendChild(tree);
+    const activeEl = targetContainer.querySelector(`.tree-item[data-id="${activeFolderId}"]`);
     if (activeEl) activeEl.classList.add('active');
   }
 
-  function renderBookmarkList(folderId, searchResults = null) {
+  function renderBookmarkList(folderId, searchResults = null, customTitle = null) {
       bookmarkListContainer.innerHTML = '';
       let itemsToShow = [];
       let breadcrumbText = '';
 
       if (searchResults !== null) {
           itemsToShow = searchResults;
-          breadcrumbText = i18n.get('searchResults');
+          breadcrumbText = customTitle || i18n.get('searchResults');
       } else {
           activeFolderId = folderId;
           if (folderId === 'starred') {
@@ -491,6 +897,13 @@ function initOptions(i18n, currentLang) {
       } else {
         renderBookmarkList(activeFolderId);
       }
+
+      // 书签数据变化时自动刷新智能分类
+      if (smartCategoryManager) {
+        smartCategoryManager.loadSmartCategories().then(() => {
+          smartCategoryManager.renderSmartCategories();
+        });
+      }
     }
   }
 
@@ -560,7 +973,8 @@ function initOptions(i18n, currentLang) {
     chrome.storage.local.get(['aiConfig', 'aiAnalysisDepth'], (data) => {
       const config = data.aiConfig || {};
       if (config.provider) {
-        aiProvider.value = config.provider;
+        // 将provider值转换为小写以匹配select选项
+        aiProvider.value = config.provider.toLowerCase();
       }
 
       const analysisDepth = data.aiAnalysisDepth || 'standard';
@@ -569,14 +983,17 @@ function initOptions(i18n, currentLang) {
         depthSelector.value = analysisDepth;
       }
 
-      document.getElementById('openaiKey').value = config.provider === 'openai' ? config.apiKey || '' : '';
-      document.getElementById('openaiModel').value = config.provider === 'openai' ? config.model || 'gpt-4o' : 'gpt-4o';
+      // 使用不区分大小写的比较来处理provider匹配
+      const providerLower = config.provider ? config.provider.toLowerCase() : '';
+      
+      document.getElementById('openaiKey').value = providerLower === 'openai' ? config.apiKey || '' : '';
+      document.getElementById('openaiModel').value = providerLower === 'openai' ? config.model || 'gpt-4o' : 'gpt-4o';
 
-      document.getElementById('deepseekKey').value = config.provider === 'deepseek' ? config.apiKey || '' : '';
-      document.getElementById('deepseekModel').value = config.provider === 'deepseek' ? config.model || 'deepseek-chat' : 'deepseek-chat';
+      document.getElementById('deepseekKey').value = providerLower === 'deepseek' ? config.apiKey || '' : '';
+      document.getElementById('deepseekModel').value = providerLower === 'deepseek' ? config.model || 'deepseek-chat' : 'deepseek-chat';
 
-      document.getElementById('openrouterKey').value = config.provider === 'openrouter' ? config.apiKey || '' : '';
-      document.getElementById('openrouterModel').value = config.provider === 'openrouter' ? config.model || '' : '';
+      document.getElementById('openrouterKey').value = providerLower === 'openrouter' ? config.apiKey || '' : '';
+      document.getElementById('openrouterModel').value = providerLower === 'openrouter' ? config.model || '' : '';
 
       handleProviderChange();
     });
@@ -767,6 +1184,10 @@ function initOptions(i18n, currentLang) {
     }
   }
 
+
+
+
+
 /**
    * Handles the click event for the "Restart AI Analysis" button.
    * Sends a message to the background script to force restart the AI task queue.
@@ -778,6 +1199,28 @@ function initOptions(i18n, currentLang) {
       chrome.runtime.sendMessage({ action: "forceRestartAiQueue" }, (response) => {
         if (response && response.status === 'success') {
           showToast(i18n.get('restartAiTasksSuccess', { count: response.restartedCount }), 4000, '#4CAF50');
+          
+          // 监听存储变化来刷新智能分类
+          const refreshHandler = (changes) => {
+            if (changes.bookmarkItems) {
+              // 刷新智能分类列表
+              if (smartCategoryManager) {
+                smartCategoryManager.loadSmartCategories().then(() => {
+                  smartCategoryManager.renderSmartCategories();
+                });
+              }
+              // 移除监听器，避免重复刷新
+              chrome.storage.onChanged.removeListener(refreshHandler);
+            }
+          };
+          
+          // 添加存储变化监听器
+          chrome.storage.onChanged.addListener(refreshHandler);
+          
+          // 设置超时自动移除监听器（10秒后）
+          setTimeout(() => {
+            chrome.storage.onChanged.removeListener(refreshHandler);
+          }, 10000);
         } else {
           showToast(i18n.get('restartAiTasksFailed', { message: response?.message || 'Unknown error' }), 3000, "#ea4335");
         }
@@ -851,6 +1294,28 @@ function initOptions(i18n, currentLang) {
             showToast(i18n.get("taskAlreadyQueued"), 2000, "#ff9800");
         } else if (response?.status === "queued") {
             showToast(i18n.get("aiRegenerateStarted"), 3000, "#4285f4");
+            
+            // 监听存储变化来刷新智能分类
+            const refreshHandler = (changes) => {
+              if (changes.bookmarkItems) {
+                // 刷新智能分类列表
+                if (smartCategoryManager) {
+                  smartCategoryManager.loadSmartCategories().then(() => {
+                    smartCategoryManager.renderSmartCategories();
+                  });
+                }
+                // 移除监听器，避免重复刷新
+                chrome.storage.onChanged.removeListener(refreshHandler);
+              }
+            };
+            
+            // 添加存储变化监听器
+            chrome.storage.onChanged.addListener(refreshHandler);
+            
+            // 设置超时自动移除监听器（10秒后）
+            setTimeout(() => {
+              chrome.storage.onChanged.removeListener(refreshHandler);
+            }, 10000);
         }
     });
   }
@@ -1027,6 +1492,14 @@ function initOptions(i18n, currentLang) {
         ${bookmark.aiStatus === 'completed' ? `
           ${bookmark.category ? `<div class="bookmark-category">${bookmark.category}</div>` : ''}
 
+          ${bookmark.smartCategories && bookmark.smartCategories.length > 0 ? `
+            <div class="bookmark-smart-categories">
+              <span class="smart-categories-label">✨ ${i18n.get('smartCategoriesLabel')}:</span>
+              ${bookmark.smartCategories.map(category => `<span class="smart-category" data-category="${category}">${category}</span>`).join('')}
+              ${bookmark.smartCategoriesConfidence ? `<span class="confidence-badge" title="${i18n.get('confidenceTooltip')}">${Math.round(bookmark.smartCategoriesConfidence * 100)}%</span>` : ''}
+            </div>
+          ` : ''}
+
           ${bookmark.tags && bookmark.tags.length > 0 ? `
             <div class="bookmark-tags">
               ${bookmark.tags.map(tag => `<span class="tag" data-tag="${tag}">${tag}</span>`).join('')}
@@ -1085,6 +1558,15 @@ function initOptions(i18n, currentLang) {
           searchByTag(tagEl.dataset.tag); // Dependency
         });
       });
+
+      // Add event listeners to the smart category elements to enable filtering by smart category.
+      const smartCategoryElements = div.querySelectorAll('.smart-category[data-category]');
+      smartCategoryElements.forEach(categoryEl => {
+        categoryEl.addEventListener('click', (e) => {
+          e.stopPropagation(); // Prevent the click from bubbling up to the main item.
+          searchBySmartCategory(categoryEl.dataset.category);
+        });
+      });
       
       return div;
   }
@@ -1134,6 +1616,15 @@ function initOptions(i18n, currentLang) {
       searchInput.value = tag;
       handleSearch();
     }
+  }
+
+  // 添加按智能分类筛选功能
+  function searchBySmartCategory(category) {
+    const results = allItems.filter(item => {
+      if (item.type !== 'bookmark') return false;
+      return item.smartCategories && item.smartCategories.includes(category);
+    });
+    renderBookmarkList(null, results, i18n.get('smartCategoryFilter', { category }));
   }
 
   // --- QA System Functions ---
