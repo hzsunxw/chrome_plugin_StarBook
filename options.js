@@ -606,11 +606,14 @@ function initOptions(i18n, currentLang) {
   
   // --- Main Functions ---
   function loadAllItems() {
+    console.log('Loading all items from storage...');
     chrome.storage.local.get("bookmarkItems", data => {
+      console.log('Loaded', (data.bookmarkItems || []).length, 'bookmarks from storage');
       allItems = data.bookmarkItems || [];
 
       // 如果没有数据，添加测试数据用于问答功能演示
       if (allItems.length === 0) {
+        console.log('No bookmarks found, adding test data');
         allItems = [...testBookmarks];
       }
 
@@ -883,14 +886,23 @@ function initOptions(i18n, currentLang) {
   }
   
   function handleStorageChange(changes) {
+    console.log('Storage change detected:', Object.keys(changes));
+
     if (changes.bookmarkItems) {
+      console.log('Bookmark items changed, updating UI...');
+      console.log('Old count:', changes.bookmarkItems.oldValue?.length || 0);
+      console.log('New count:', changes.bookmarkItems.newValue?.length || 0);
+
       allItems = changes.bookmarkItems.newValue || [];
+
       // --- FIX: Check if active folder exists by its referenceId ---
       if (!allItems.some(item => (item.serverId === activeFolderId || item.clientId === activeFolderId))) {
           if (activeFolderId !== 'root' && activeFolderId !== 'starred') {
              activeFolderId = 'root';
           }
       }
+
+      // 强制重新渲染所有UI组件
       renderFolderTree();
       if (searchInput.value.trim()) {
         handleSearch();
@@ -904,6 +916,8 @@ function initOptions(i18n, currentLang) {
           smartCategoryManager.renderSmartCategories();
         });
       }
+
+      console.log('UI updated with', allItems.length, 'bookmarks');
     }
   }
 

@@ -253,23 +253,32 @@ async function handleMessages(request, sender, sendResponse) {
                 return true;
             }
             case 'addCurrentPage': {
+                console.log('addCurrentPage message received from popup');
                 (async () => {
                     try {
                         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
                         const currentTab = tabs[0];
+                        console.log('Current tab found:', currentTab?.url);
+
                         if (!currentTab || !currentTab.url || currentTab.url.startsWith('chrome://')) {
+                            console.log('No valid active tab found');
                             sendResponse({ status: "no_active_tab" });
                             return;
                         }
 
                         const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+                        console.log('Checking for duplicate URL:', currentTab.url);
+
                         if (bookmarkItems.some(b => b.url === currentTab.url)) {
+                            console.log('Duplicate URL found, skipping');
                             sendResponse({ status: "duplicate" });
                             return;
                         }
 
+                        console.log('Calling handleAsyncBookmarkAction for popup');
                         await handleAsyncBookmarkAction(action, data || { parentId: 'root' }, currentTab);
-                        //await syncItemChange('add', newBookmark);
+                        console.log('Bookmark added successfully via popup');
+
                         sendResponse({ status: "queued" });
 
                     } catch (e) {
@@ -752,6 +761,8 @@ async function syncItemChange(type, payload) {
 */
 
 async function handleAsyncBookmarkAction(action, data, tab) {
+    console.log('handleAsyncBookmarkAction called:', { action, tabUrl: tab?.url, tabTitle: tab?.title });
+
     if (action === "addCurrentPage") {
         const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
         const newBookmark = {
@@ -781,12 +792,16 @@ async function handleAsyncBookmarkAction(action, data, tab) {
         };
         delete newBookmark.id; // Ensure the old 'id' field is gone.
 
+        console.log('Creating new bookmark:', newBookmark);
+
         await chrome.storage.local.set({ bookmarkItems: [newBookmark, ...bookmarkItems] });
-        
+        console.log('Bookmark saved to storage, total items:', bookmarkItems.length + 1);
+
         // The two processes are now independent and use the stable clientId.
         await syncItemChange('add', newBookmark);
-        await enqueueTask(newBookmark.clientId); 
-        
+        await enqueueTask(newBookmark.clientId);
+
+        console.log('Bookmark processing queued successfully');
         return newBookmark;
     }
 }
@@ -2387,11 +2402,29 @@ function extractMetaInfo(html) {
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId === CONTEXT_MENU_ID) {
-        if (!tab || !tab.url || tab.url.startsWith('chrome://')) return;
-        const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
-        if (bookmarkItems.some(b => b.type === 'bookmark' && b.url === tab.url)) return;
-        await handleAsyncBookmarkAction("addCurrentPage", { parentId: 'root' }, tab);
-        //await syncItemChange('add', newBookmark);
+        console.log('Context menu clicked for URL:', tab?.url);
+
+        if (!tab || !tab.url || tab.url.startsWith('chrome://')) {
+            console.log('Invalid tab or URL, skipping bookmark');
+            return;
+        }
+
+        try {
+            const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+
+            // 检查URL是否已存在
+            if (bookmarkItems.some(b => b.type === 'bookmark' && b.url === tab.url)) {
+                console.log('URL already bookmarked, skipping:', tab.url);
+                return;
+            }
+
+            console.log('Adding bookmark via context menu:', tab.title);
+            await handleAsyncBookmarkAction("addCurrentPage", { parentId: 'root' }, tab);
+            console.log('Bookmark added successfully via context menu');
+
+        } catch (error) {
+            console.error('Error adding bookmark via context menu:', error);
+        }
     }
 });
 

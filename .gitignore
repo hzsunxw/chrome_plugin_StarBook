@@ -6,5 +6,7 @@ ui-*.*
 ai-*.*
 folder-toggle-fix.html
 i18n-fix-verification.html
+.gitignore
 server/
 openspec/
+.claude/
