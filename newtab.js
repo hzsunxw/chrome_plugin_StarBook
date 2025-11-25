@@ -31,9 +31,16 @@ async function loadStarredBookmarks() {
     const bookmarks = result.bookmarkItems || [];
     
     // 过滤出标星书签
-    const starredBookmarks = bookmarks.filter(bookmark => 
+    const starredBookmarks = bookmarks.filter(bookmark =>
       bookmark.type === 'bookmark' && bookmark.isStarred === true
     );
+
+    // 按点击次数降序排序
+    const sortedBookmarks = starredBookmarks.sort((a, b) => {
+      const aCount = a.clickCount || 0;
+      const bCount = b.clickCount || 0;
+      return bCount - aCount;
+    });
     
     if (starredBookmarks.length === 0) {
       container.innerHTML = `
@@ -49,11 +56,12 @@ async function loadStarredBookmarks() {
     // 渲染书签列表
     container.innerHTML = `
       <div class="bookmarks-grid">
-        ${starredBookmarks.map(bookmark => `
+        ${sortedBookmarks.map(bookmark => `
           <div class="bookmark-card" data-url="${escapeHtml(bookmark.url)}">
             <div class="bookmark-header">
               <img class="favicon" src="https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}&sz=16" alt="Favicon">
               <h3 class="bookmark-title">${escapeHtml(bookmark.title || '无标题')}</h3>
+              ${bookmark.clickCount ? `<span class="click-count">${bookmark.clickCount} 次点击</span>` : ''}
             </div>
             <div class="bookmark-url">${escapeHtml(bookmark.url)}</div>
             ${bookmark.summary ? `<div class="bookmark-summary">${escapeHtml(bookmark.summary)}</div>` : ''}
@@ -130,30 +138,51 @@ function applyI18nMessages() {
 // 添加书签点击事件监听器
 function addBookmarkClickListeners() {
   const bookmarkCards = document.querySelectorAll('.bookmark-card');
-  
+
   bookmarkCards.forEach(card => {
     card.addEventListener('click', function(event) {
       // 防止事件冒泡到其他可能的事件处理程序
       event.stopPropagation();
-      
+
       const url = card.getAttribute('data-url');
       if (url) {
-        // 在当前标签页中打开URL
+        // 使用setTimeout延迟消息发送，确保页面跳转优先执行
+        setTimeout(() => {
+          chrome.runtime.sendMessage({
+            action: 'updateBookmarkClickCount',
+            url: url
+          }).catch(error => {
+            console.warn('更新点击计数失败:', error);
+          });
+        }, 0);
+
+        // 立即在当前标签页中打开URL
         window.location.href = url;
       }
     });
-    
+
     // 添加键盘支持（可选的辅助功能改进）
     card.addEventListener('keydown', function(event) {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         const url = card.getAttribute('data-url');
         if (url) {
+          // 使用setTimeout延迟消息发送，确保页面跳转优先执行
+          setTimeout(() => {
+            chrome.runtime.sendMessage({
+              action: 'updateBookmarkClickCount',
+              url: url
+            }).catch(error => {
+              console.warn('更新点击计数失败:', error);
+            });
+          }, 0);
+
+          // 立即跳转页面
           window.location.href = url;
         }
       }
     });
-    
+
     // 添加适当的ARIA角色和tabindex以支持键盘导航
     card.setAttribute('role', 'button');
     card.setAttribute('tabindex', '0');

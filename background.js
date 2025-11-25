@@ -340,7 +340,10 @@ async function handleMessages(request, sender, sendResponse) {
                         smartCategories: [], // AI智能分类标签数组
                         smartCategoriesUpdated: null, // 分类更新时间
                         smartCategoriesVersion: 0, // 分类算法版本
-                        smartCategoriesConfidence: null // AI分类置信度
+                        smartCategoriesConfidence: null, // AI分类置信度
+                        // === 新增点击统计字段 ===
+                        clickCount: 0,                // 点击次数统计
+                        lastAccessed: null            // 最后访问时间
                     };
 
                     bookmarkItems.unshift(newBookmark);
@@ -446,6 +449,19 @@ async function handleMessages(request, sender, sendResponse) {
                 })();
                 return true; // Keep channel open for async response
             }
+            case 'updateBookmarkClickCount': {
+                const { url } = request;
+                if (url) {
+                    // 立即响应，异步处理点击计数更新
+                    sendResponse({ status: 'queued' });
+                    updateBookmarkClickCount(url).catch(error => {
+                        console.error('点击计数更新失败:', error);
+                    });
+                } else {
+                    sendResponse({ status: 'error', message: 'URL is required' });
+                }
+                return false; // 不保持消息通道
+            }
             // === 智能分类相关消息处理（已整合到AI分析中） ===
             // 智能分类现在通过AI分析队列统一处理，不再需要独立的分类消息
             default:
@@ -513,7 +529,10 @@ async function importBrowserBookmarks(sendResponse) {
                     url: node.url, type: 'bookmark', isStarred: false, summary: '', tags: [], aiStatus: 'pending',
                     notes: '', contentType: '', estimatedReadTime: null, readingLevel: '',
                     // === 新增智能分类字段 ===
-                    smartCategories: [], smartCategoriesUpdated: null, smartCategoriesVersion: 0, smartCategoriesConfidence: null
+                    smartCategories: [], smartCategoriesUpdated: null, smartCategoriesVersion: 0, smartCategoriesConfidence: null,
+                    // === 新增点击统计字段 ===
+                    clickCount: 0,                // 点击次数统计
+                    lastAccessed: null            // 最后访问时间
                 };
                 newBookmarks.push(newBookmark);
             }
@@ -788,7 +807,10 @@ async function handleAsyncBookmarkAction(action, data, tab) {
             smartCategories: [],
             smartCategoriesUpdated: null,
             smartCategoriesVersion: 0,
-            smartCategoriesConfidence: null
+            smartCategoriesConfidence: null,
+            // === 新增点击统计字段 ===
+            clickCount: 0,                // 点击次数统计
+            lastAccessed: null            // 最后访问时间
         };
         delete newBookmark.id; // Ensure the old 'id' field is gone.
 
@@ -844,6 +866,53 @@ async function updateLocalBookmark(bookmarkClientId, updates) {
         return updatedBookmark;
     }
     return null;
+}
+
+/**
+ * 更新书签的点击计数
+ * @param {string} url - 书签的URL
+ */
+async function updateBookmarkClickCount(url) {
+    try {
+        const { bookmarkItems = [] } = await chrome.storage.local.get("bookmarkItems");
+        const bookmarkIndex = bookmarkItems.findIndex(b => b.type === 'bookmark' && b.url === url);
+
+        if (bookmarkIndex !== -1) {
+            // 创建更新后的数组副本
+            const updatedItems = [...bookmarkItems];
+            const currentClickCount = updatedItems[bookmarkIndex].clickCount || 0;
+
+            updatedItems[bookmarkIndex] = {
+                ...updatedItems[bookmarkIndex],
+                clickCount: currentClickCount + 1,
+                lastAccessed: new Date().toISOString(),
+                lastModified: new Date().toISOString()
+            };
+
+            // 异步保存到存储，不等待完成
+            chrome.storage.local.set({ bookmarkItems: updatedItems }).catch(error => {
+                console.error('存储更新失败:', error);
+            });
+
+            // 异步服务器同步（不等待）
+            const bookmark = updatedItems[bookmarkIndex];
+            if (bookmark.serverId) {
+                syncItemChange('update', {
+                    serverId: bookmark.serverId,
+                    clickCount: bookmark.clickCount,
+                    lastAccessed: bookmark.lastAccessed,
+                    lastModified: bookmark.lastModified
+                }).catch(error => {
+                    console.warn('服务器同步失败:', error);
+                });
+            }
+
+            console.log(`书签点击计数已更新: ${url} (${bookmark.clickCount} 次)`);
+        }
+    } catch (error) {
+        console.error('更新点击计数失败:', error);
+        // 不抛出错误，避免影响用户体验
+    }
 }
 
 /*
