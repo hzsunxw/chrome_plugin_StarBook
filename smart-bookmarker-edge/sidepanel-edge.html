@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Bookmarker - Edge Side Panel</title>
+    <link rel="stylesheet" href="sidepanel-edge.css">
+    <style>
+        /* Edge-specific optimizations */
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 16px;
+            background: #f9f9f9;
+            color: #1f1f1f;
+        }
+
+        .edge-header {
+            background: linear-gradient(135deg, #0078d4 0%, #40e0d0 100%);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0, 120, 212, 0.2);
+        }
+
+        .edge-optimizations {
+            background: white;
+            border: 1px solid #e1e1e1;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .edge-badge {
+            background: #0078d4;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Windows-specific styling */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #2d2d30;
+                color: #ffffff;
+            }
+
+            .edge-optimizations {
+                background: #3f3f46;
+                border-color: #5e5e64;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="edge-header">
+        <h2>Smart Bookmarker</h2>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="edge-badge">Edge</span>
+            <span id="bookmarker-status">Ready</span>
+        </div>
+    </div>
+
+    <div class="edge-optimizations">
+        <h3>Edge Optimizations</h3>
+        <div id="optimization-status">
+            <div>✓ Enhanced performance mode</div>
+            <div>✓ Windows integration enabled</div>
+            <div>✓ Touch-friendly interface</div>
+            <div>✓ Fluent design system</div>
+        </div>
+    </div>
+
+    <div id="bookmark-content">
+        <div class="edge-optimizations">
+            <h4>Learning Assistant</h4>
+            <p>AI-powered Q&A for your bookmarked content, optimized for Edge.</p>
+            <button id="edge-quiz-button" style="
+                background: #0078d4;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-family: 'Segoe UI', system-ui;
+                font-weight: 600;
+                width: 100%;
+            ">
+                Generate Quiz
+            </button>
+        </div>
+    </div>
+
+    <div class="edge-optimizations">
+        <h4>Quick Actions</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button class="edge-action-btn" onclick="openOptions()">
+                ⚙️ Settings
+            </button>
+            <button class="edge-action-btn" onclick="syncBookmarks()">
+                🔄 Sync
+            </button>
+        </div>
+    </div>
+
+    <script src="browser-adapter.js"></script>
+    <script src="sidepanel-edge.js"></script>
+</body>
+</html>

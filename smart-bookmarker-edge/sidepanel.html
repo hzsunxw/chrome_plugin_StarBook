@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="learningAssistant.css">
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+        }
+        /* 针对 sidepanel 的一些微调 */
+        #learning-assistant-panel {
+            position: static;
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            font-size: 13px;
+        }
+        #la-header {
+            cursor: default;
+        }
+    </style>
+</head>
+<body>
+    <div id="learning-assistant-panel">
+        <div id="la-header">
+            <h4 data-i18n="learningAssistantTitle"></h4>
+        </div>
+        <div id="la-content">
+            <div id="assistant-placeholder"><p data-i18n="assistantPlaceholder"></p></div>
+            <div id="assistant-main" style="display: none;">
+                <div class="la-section">
+                    <strong data-i18n="askAboutArticle"></strong>
+                    <div class="la-input-group">
+                        <textarea id="la-qa-input" data-i18n-placeholder="qaInputPlaceholder" rows="2"></textarea>
+                        <button id="la-ask-btn" data-i18n="askButton"></button>
+                    </div>
+                    <div id="la-qa-answer" class="la-answer-area"></div>
+                </div>
+                <div class="la-section">
+                    <strong data-i18n="generateQuiz"></strong>
+                    <button id="la-quiz-btn" data-i18n="generateQuizButton"></button>
+                    <div id="la-quiz-content" class="la-answer-area"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="i18n.js"></script>
+    <script src="sidepanel.js"></script>
+</body>
+</html>

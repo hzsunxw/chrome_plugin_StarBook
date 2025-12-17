@@ -1,0 +1,792 @@
+{
+  "extensionName": {
+    "message": "智能书签",
+    "description": "扩展程序的名称。"
+  },
+  "extensionDescription": {
+    "message": "一个智能书签管理工具，利用AI自动为您的书签进行分类、总结和打标签。",
+    "description": "扩展程序的描述。"
+  },
+  "addCurrentPage": {
+    "message": "收藏当前页面",
+    "description": "“添加当前页面为书签”按钮的文本。"
+  },
+  "settings": {
+    "message": "完整列表与设置",
+    "description": "打开选项页面的按钮文本。"
+  },
+  "allBookmarks": {
+    "message": "全部",
+    "description": "“所有书签”标签页的标题。"
+  },
+  "starredBookmarks": {
+    "message": "星标",
+    "description": "“星标书签”标签页的标题。"
+  },
+  "noBookmarks": {
+    "message": "还没有书签，快去添加吧！",
+    "description": "书签列表为空时显示的消息。"
+  },
+  "processing": {
+    "message": "处理中...",
+    "description": "提示操作正在进行的Toast消息。"
+  },
+  "taskQueued": {
+    "message": "AI分析任务已加入队列。",
+    "description": "添加新书签并排队等待AI处理时的Toast消息。"
+  },
+  "pageExists": {
+    "message": "此页面已被收藏。",
+    "description": "尝试添加重复书签时的Toast消息。"
+  },
+  "noActiveTab": {
+    "message": "未找到可收藏的活动页面。",
+    "description": "没有活动标签页时的错误消息。"
+  },
+  "operationFailed": {
+    "message": "操作失败，请重试。",
+    "description": "操作失败时的通用错误消息。"
+  },
+  "aiProcessing": {
+    "message": "AI分析中...",
+    "description": "书签正在被AI处理时的状态文本。"
+  },
+  "aiFailed": {
+    "message": "AI分析失败。",
+    "description": "书签AI分析失败时的状态文本。"
+  },
+  "optionsTitle": {
+    "message": "我的智能书签",
+    "description": "选项页的标题。"
+  },
+  "importBookmarks": {
+    "message": "从浏览器导入",
+    "description": "从浏览器导入书签的按钮。"
+  },
+  "aiConfig": {
+    "message": "AI配置",
+    "description": "AI设置的按钮和模态框标题。"
+  },
+  "qaSystem": {
+    "message": "智能问答",
+    "description": "问答系统的按钮和模态框标题。"
+  },
+  "searchPlaceholder": {
+    "message": "搜索标题、摘要、分类、网址...",
+    "description": "选项页面上搜索框的占位符。"
+  },
+  "close": {
+    "message": "关闭",
+    "description": "模态框上关闭按钮的标题。"
+  },
+  "aiProvider": {
+    "message": "AI提供商",
+    "description": "AI提供商选择器的标签。"
+  },
+  "apiKey": {
+    "message": "API密钥",
+    "description": "API密钥输入框的标签。"
+  },
+  "model": {
+    "message": "模型",
+    "description": "AI模型选择器的标签。"
+  },
+  "saveConfig": {
+    "message": "保存配置",
+    "description": "保存AI配置的按钮。"
+  },
+  "configSaved": {
+    "message": "配置已成功保存！",
+    "description": "AI配置保存后的Toast消息。"
+  },
+  "languageChanged": {
+    "message": "语言设置已更改，正在重新加载...",
+    "description": "更改语言时的Toast消息。"
+  },
+  "importSuccess": {
+    "message": "成功导入 $count$ 个新书签。AI分析正在进行中。",
+    "description": "成功导入时的Toast消息。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "5"
+      }
+    }
+  },
+  "importFailed": {
+    "message": "书签导入失败。",
+    "description": "导入失败时的Toast消息。"
+  },
+  "importNoNew": {
+    "message": "没有新的书签可供导入。",
+    "description": "没有新书签可导入时的Toast消息。"
+  },
+  "toggleStar": {
+    "message": "切换星标",
+    "description": "星标按钮的工具提示。"
+  },
+  "regenerateAI": {
+    "message": "重新生成AI数据",
+    "description": "重新生成按钮的工具提示。"
+  },
+  "delete": {
+    "message": "删除书签",
+    "description": "删除按钮的工具提示。"
+  },
+  "confirmDelete": {
+    "message": "您确定要删除此书签吗？",
+    "description": "删除书签前的确认消息。"
+  },
+  "bookmarkDeleted": {
+    "message": "书签已删除。",
+    "description": "删除书签后的Toast消息。"
+  },
+  "regenerateRequestSent": {
+    "message": "重新生成AI数据的请求已发送。",
+    "description": "点击重新生成时的Toast消息。"
+  },
+  "taskAlreadyQueued": {
+    "message": "此任务已在队列中。",
+    "description": "任务已在队列中时的Toast消息。"
+  },
+  "aiRegenerateStarted": {
+    "message": "AI重新生成过程已开始。",
+    "description": "AI重新生成开始时的Toast消息。"
+  },
+  "keyPoints": {
+    "message": "核心要点",
+    "description": "“核心要点”部分的标签。"
+  },
+  "contentType": {
+    "message": "内容类型",
+    "description": "内容类型的标签。"
+  },
+  "readingTime": {
+    "message": "预计阅读",
+    "description": "预计阅读时间的标签。"
+  },
+  "readingLevel": {
+    "message": "阅读难度",
+    "description": "阅读难度的标签。"
+  },
+  "minutes": {
+    "message": "分钟",
+    "description": "分钟的单位。"
+  },
+  "contentType_article": { "message": "文章" },
+  "contentType_tutorial": { "message": "教程" },
+  "contentType_news": { "message": "新闻" },
+  "contentType_reference": { "message": "参考" },
+  "contentType_tool": { "message": "工具" },
+  "contentType_entertainment": { "message": "娱乐" },
+  "contentType_blog": { "message": "博客" },
+  "contentType_documentation": { "message": "文档" },
+  "contentType_research": { "message": "研究" },
+  "readingLevel_beginner": { "message": "初级" },
+  "readingLevel_intermediate": { "message": "中级" },
+  "readingLevel_advanced": { "message": "高级" },
+  "rootFolder": {
+    "message": "所有书签",
+    "description": "根文件夹的面包屑导航文本。"
+  },
+  "searchResults": {
+    "message": "搜索结果",
+    "description": "搜索结果的面包屑导航文本。"
+  },
+  "noMatchingBookmarks": {
+    "message": "没有找到匹配的书签。",
+    "description": "没有搜索结果时的空状态文本。"
+  },
+  "folderEmpty": {
+    "message": "此文件夹为空。",
+    "description": "空文件夹的空状态文本。"
+  },
+  "deleteFolder": {
+    "message": "删除文件夹",
+    "description": "删除文件夹的上下文菜单项。"
+  },
+  "confirmDeleteFolder": {
+    "message": "您确定要删除文件夹“$folderName$”及其所有内容吗？此操作无法撤销。",
+    "description": "删除文件夹前的确认消息。",
+    "placeholders": {
+      "folderName": {
+        "content": "$1"
+      }
+    }
+  },
+  "folderDeleted": {
+    "message": "文件夹及其内容已删除。",
+    "description": "删除文件夹后的Toast消息。"
+  },
+  "tagsMissing": { "message": "标签未生成。" },
+  "summaryMissing": { "message": "摘要未生成。" },
+  "contextMenuTitle": {
+    "message": "使用智能书签收藏",
+    "description": "上下文菜单项的标题。"
+  },
+  "editNotes": {
+    "message": "编辑备注",
+    "description": "编辑备注按钮的工具提示。"
+  },
+  "notesSaved": {
+    "message": "备注已成功保存！",
+    "description": "备注保存后显示的Toast消息。"
+  },
+  "notesPlaceholder": {
+    "message": "在此输入您的私人备注（如账号、密码等）。此信息仅保存在本地，不会上传。",
+    "description": "备注文本区域的占位符文本。"
+  },
+  "save": {
+    "message": "保存",
+    "description": "用于保存的按钮文本。"
+  },
+  "cancel": {
+    "message": "取消",
+    "description": "用于取消操作的按钮文本。"
+  },
+  "qaQuestionLabel": {
+    "message": "我的问题：",
+    "description": "智能问答模态框中问题输入区的标签。"
+  },
+  "askQuestion": {
+    "message": "提问",
+    "description": "智能问答模态框中提交问题的按钮文本。"
+  },
+  "qaSystemTitle": {
+    "message": "欢迎使用智能问答",
+    "description": "智能问答系统信息框的主标题。"
+  },
+  "qaSystemDescription": {
+    "message": "本系统会根据您的收藏，为您寻找答案和建议。它可以：",
+    "description": "关于智能问答系统功能的简短描述。"
+  },
+  "qaFeature1": {
+    "message": "理解您的自然语言问题。",
+    "description": "智能问答系统的功能点一。"
+  },
+  "qaFeature2": {
+    "message": "在您已收藏的内容中查找最相关的书签。",
+    "description": "智能问答系统的功能点二。"
+  },
+  "qaFeature3": {
+    "message": "提供直接的回答与总结。",
+    "description": "智能问答系统的功能点三。"
+  },
+  "qaFeature4": {
+    "message": "根据您的兴趣推荐新的网站。",
+    "description": "智能问答系统的功能点四。"
+  },
+  "qaTip": {
+    "message": "提示：可以试试问“如何学习JavaScript？”或“推荐一些设计工具”。",
+    "description": "给用户的使用提示，告知可以问什么样的问题。"
+  },
+  "qaSearchingBookmarks": {
+    "message": "正在检索您的书签...",
+    "description": "提问后显示的加载信息。"
+  },
+  "addToBookmarks": {
+    "message": "添加到收藏",
+    "description": "将推荐网站添加到收藏的按钮。"
+  },
+  "aiAnswer": {
+    "message": "AI 回答",
+    "description": "智能问答模态框中AI回答部分的标题。"
+  },
+  "alreadyBookmarked": {
+    "message": "已收藏",
+    "description": "表示一个推荐网站已在收藏中的标签。"
+  },
+  "newRecommendations": {
+    "message": "为您找到新的推荐",
+    "description": "智能问答中新网站推荐的标题。"
+  },
+  "practicalTips": {
+    "message": "实用建议",
+    "description": "智能问答中实用建议部分的标题。"
+  },
+  "questionPlaceholder": {
+    "message": "在此输入您的问题，例如：“pdf转ppt的工具有哪些？”",
+    "description": "智能问答模态框中问题输入区的占位符文本。"
+  },
+  "recommendationReason": {
+    "message": "推荐理由",
+    "description": "推荐一个网站的理由的标签。"
+  },
+  "relatedInBookmarks": {
+    "message": "在您的收藏中找到相关内容",
+    "description": "智能问答中与问题相关的已有收藏的标题。"
+  },
+  "resetQA": {
+    "message": "返回重问",
+    "description": "重置智能问答界面以提出新问题的按钮。"
+  },
+  "verifying": {
+    "message": "验证中",
+    "description": "表示一个推荐网址正在被验证的标签。"
+  },
+  "visitSite": {
+    "message": "访问网站",
+    "description": "访问一个推荐网站的按钮。"
+  },
+  "analysisDepth": {
+    "message": "分析深度",
+    "description": "AI分析深度选择下拉菜单的标签。"
+  },
+  "analysisDepthBasic": {
+    "message": "基础 (摘要和标签)",
+    "description": "AI分析深度的“基础”选项。"
+  },
+  "analysisDepthStandard": {
+    "message": "标准 (基础 + 分类和要点)",
+    "description": "AI分析深度的“标准”选项。"
+  },
+  "analysisDepthDetailed": {
+    "message": "详细 (标准 + 内容类型、阅读难度等)",
+    "description": "AI分析深度的“详细”选项。"
+  },
+  "analysisDepthHelp": {
+    "message": "更深度的分析会提供更丰富的细节，但会消耗更多的API额度。",
+    "description": "解释分析深度利弊的帮助文本。"
+  },
+  "learningAssistantFallbackTitle": {
+    "message": "🎓 学习助手 (后备模式)",
+    "description": "学习助手作为后备方案注入时的面板标题。"
+  },
+  "askAboutArticle": {
+    "message": "针对本文提问：",
+    "description": "提问输入区域的标签。"
+  },
+  "qaInputPlaceholder": {
+    "message": "例如：文中提到的核心算法是什么？",
+    "description": "问题输入框的占位文本。"
+  },
+  "askButton": {
+    "message": "提问",
+    "description": "提交问题的按钮文本。"
+  },
+  "analyzingAndThinking": {
+    "message": "🤖 正在分析文章并思考答案...",
+    "description": "等待问题回答时显示的加载信息。"
+  },
+  "errorPrefix": {
+    "message": "错误",
+    "description": "错误信息的前缀。"
+  },
+  "generateQuiz": {
+    "message": "生成学习测验：",
+    "description": "测验生成区域的标签。"
+  },
+  "generateQuizButton": {
+    "message": "点击生成3-5个关键问题",
+    "description": "生成测验的按钮文本。"
+  },
+  "readingAndQuizzing": {
+    "message": "🤖 正在阅读文章并为您出题...",
+    "description": "生成测验时显示的加载信息。"
+  },
+  "viewAnswer": {
+    "message": "查看答案",
+    "description": "用于展开显示测验答案的 details/summary 元素的文本。"
+  },
+  "learningAssistant": {
+    "message": "学习助手",
+    "description": "学习助手按钮的工具提示。"
+  },
+  "restartAiTasks": {
+    "message": "重启AI分析",
+    "description": "重启所有待处理或失败的AI任务的按钮。"
+  },
+  "restartAiTasksTooltip": {
+    "message": "强制重新分析所有处理中或失败的书签。",
+    "description": "“重启AI分析”按钮的工具提示。"
+  },
+  "loginOrRegister": {
+    "message": "登录 / 注册",
+    "description": "用户登录或注册的按钮文本。"
+  },
+  "logout": {
+    "message": "退出",
+    "description": "用户退出的按钮文本。"
+  },
+  "authenticatedUser": {
+    "message": "已认证用户"
+  },
+  "userIdDisplay": {
+    "message": "用户ID: ${userId}..."
+  },
+  "clearConfig": {
+    "message": "清除配置",
+    "description": "清除所有已保存的AI配置的按钮。"
+  },
+  "loginModalTitle": {
+    "message": "登录或注册",
+    "description": "登录模态框的标题。"
+  },
+  "emailPlaceholder": {
+    "message": "请输入您的邮箱",
+    "description": "邮箱输入框的占位符。"
+  },
+  "passwordPlaceholder": {
+    "message": "请输入您的密码",
+    "description": "密码输入框的占位符。"
+  },
+  "orDivider": {
+    "message": "或",
+    "description": "分隔符文本，例如登录选项之间的“或”。"
+  },
+  "loginWithGoogle": {
+    "message": "使用 Google 登录",
+    "description": "Google社交登录的按钮文本。"
+  },
+  "loginWithGithub": {
+    "message": "使用 GitHub 登录",
+    "description": "GitHub社交登录的按钮文本。"
+  },
+  "loginWithWechat": {
+    "message": "使用微信登录",
+    "description": "微信社交登录的按钮文本。"
+  },
+  "importingBookmarks": {
+    "message": "正在导入书签，请稍候...",
+    "description": "书签导入期间显示的加载信息。"
+  },
+  "langEnglish": {
+    "message": "English",
+    "description": "“英语”的语言选项。"
+  },
+  "langChinese": {
+    "message": "简体中文",
+    "description": "“简体中文”的语言选项。"
+  },
+  "moreTags": {
+    "message": "+${count} 更多",
+    "description": "表示列表中未显示的更多标签的指示符，例如“+3 更多”。"
+  },
+  "initializationError": {
+    "message": "扩展程序初始化失败，请尝试重新加载。",
+    "description": "选项页初始化失败时显示的错误信息。"
+  },
+  "confirmClearAIConfig": {
+    "message": "您确定要清除所有AI配置吗？这将删除本地和服务器上的配置。",
+    "description": "清除所有AI设置前的确认信息。"
+  },
+  "aiConfigCleared": {
+    "message": "AI配置已完全清除（本地和服务器）。",
+    "description": "AI配置在各处都清除成功时的成功提示。"
+  },
+  "aiConfigClearedLocalOnly": {
+    "message": "本地AI配置已清除，但删除服务器配置失败。",
+    "description": "仅本地AI配置被清除时的警告提示。"
+  },
+  "aiConfigClearFailed": {
+    "message": "清除AI配置失败：${error}",
+    "description": "清除AI配置失败时的错误提示。"
+  },
+  "confirmRestartAiTasks": {
+    "message": "您确定要强制重启AI分析任务吗？\n这将清空现有队列，并重新检查所有书签，为处理中、失败或内容不完整的书签重新创建任务。",
+    "description": "重启AI队列前的确认信息。"
+  },
+  "restartingAiTasks": {
+    "message": "正在发送重启指令...",
+    "description": "表示AI重启指令已发送的提示信息。"
+  },
+  "restartAiTasksSuccess": {
+    "message": "已成功重新创建 ${count} 个AI分析任务。",
+    "description": "AI任务重启后的成功提示。"
+  },
+  "restartAiTasksFailed": {
+    "message": "操作失败：${message}",
+    "description": "重启AI任务失败时的错误提示。"
+  },
+  "importing": {
+    "message": "导入中...",
+    "description": "导入过程中显示的按钮文本。"
+  },
+  "importStarted": {
+    "message": "导入过程已开始...",
+    "description": "书签导入开始时的提示信息。"
+  },
+  "qaMustEnterQuestion": {
+    "message": "请输入一个问题再提问。",
+    "description": "如果用户尝试问一个空问题时的警告信息。"
+  },
+  "qaSearchError": {
+    "message": "搜索过程中发生错误。",
+    "description": "智能问答搜索失败时的警告信息。"
+  },
+  "qaJsonParseError": {
+    "message": "解析AI返回结果失败，格式可能不正确。",
+    "description": "AI返回结果不是有效的JSON时的错误信息。"
+  },
+  "qaTipRetry": {
+    "message": "尝试换一种方式提问。",
+    "description": "给用户的智能问答使用提示。"
+  },
+  "qaTipCheckConfig": {
+    "message": "检查您的AI配置和API密钥。",
+    "description": "给用户的智能问答使用提示。"
+  },
+  "qaAiSearchError": {
+    "message": "AI搜索失败：${message}",
+    "description": "AI驱动的搜索失败时的错误信息。"
+  },
+  "qaSearchGoogle": {
+    "message": "在谷歌上搜索答案。",
+    "description": "在谷歌上搜索的后备建议。"
+  },
+  "qaSearchBaidu": {
+    "message": "在百度上搜索答案。",
+    "description": "在百度上搜索的后备建议。"
+  },
+  "qaTipCheckNetwork": {
+    "message": "检查您的网络连接。",
+    "description": "给用户的智能问答使用提示。"
+  },
+  "qaTruncatedError": {
+    "message": "AI返回结果似乎被截断了。",
+    "description": "AI返回结果不完整时的错误信息。"
+  },
+  "qaTipRetryComplete": {
+    "message": "请重试以获取完整答复。",
+    "description": "给用户的智能问答使用提示。"
+  },
+  "qaNoResults": {
+    "message": "没有为您的问题找到相关的书签：${question}",
+    "description": "智能问答搜索没有结果时显示的信息。"
+  },
+  "qaSuggestions": {
+    "message": "建议",
+    "description": "建议列表的标题。"
+  },
+  "qaSuggestion1": {
+    "message": "尝试使用不同的关键词。",
+    "description": "给用户的建议。"
+  },
+  "qaSuggestion2": {
+    "message": "确保您的书签已被AI分析过。",
+    "description": "给用户的建议。"
+  },
+  "qaSuggestion3": {
+    "message": "问一个更宽泛的问题。",
+    "description": "给用户的建议。"
+  },
+  "qaResultsFound": {
+    "message": "找到 ${count} 个相关结果。",
+    "description": "表示搜索结果数量的标题。"
+  },
+  "relevance": {
+    "message": "相关性",
+    "description": "相关性分数的标签。"
+  },
+  "viewDetails": {
+    "message": "查看详情",
+    "description": "查看更多详情的按钮文本。"
+  },
+  "addedToBookmarksToast": {
+    "message": "已将“${title}”添加到您的书签。",
+    "description": "推荐网站被收藏为书签时的成功提示。"
+  },
+  "alreadyExistsToast": {
+    "message": "此页面已在您的书签中。",
+    "description": "从推荐中尝试添加重复书签时的提示信息。"
+  },
+  "addFailedToast": {
+    "message": "添加书签失败：${message}",
+    "description": "添加推荐网站失败时的错误提示。"
+  },
+  "qaReasonRelated": {
+    "message": "在您现有的书签中找到。",
+    "description": "对于已在用户收藏中的书签给出的理由。"
+  },
+  "openingLearningAssistant": {
+    "message": "正在打开学习助手...",
+    "description": "打开学习助手时显示的提示信息。"
+  },
+  "qaPromptSystem": { "message": "你是智能助手，基于用户的收藏偏好回答问题并推荐网站。" },
+  "qaPromptQuestion": { "message": "问题" },
+  "qaPromptOverview": { "message": "用户收藏概况" },
+  "qaPromptTotal": { "message": "总收藏数" },
+  "qaPromptSites": { "message": "个网站" },
+  "qaPromptMainCat": { "message": "主要分类" },
+  "qaPromptCommonTags": { "message": "常用标签" },
+  "qaPromptRelated": { "message": "用户现有相关收藏" },
+  "qaPromptUnclassified": { "message": "未分类" },
+  "qaPromptFormatInstructions": { "message": "返回格式（必须返回完整的JSON，不能截断）：" },
+  "qaPromptFormatJson": { "message": "{\"answer\":\"简短回答\",\"recommendations\":[{\"title\":\"网站名\",\"url\":\"完整URL\",\"description\":\"简短描述\",\"category\":\"分类\",\"tags\":[\"标签1\",\"标签2\"],\"why\":\"简短理由\"}],\"existingBookmarks\":[],\"tips\":[\"建议1\",\"建议2\"]}" },
+  "qaPromptStrictReq": { "message": "严格要求" },
+  "qaPromptReq1": { "message": "1. 必须返回完整的JSON，确保以}结尾" },
+  "qaPromptReq2": { "message": "2. 只返回JSON，不要任何其他文字或markdown" },
+  "qaPromptReq3": { "message": "3. 推荐3个真实网站，每个描述不超过25字" },
+  "qaPromptReq4": { "message": "4. URL必须完整可访问" },
+  "qaPromptReq5": { "message": "5. 如果内容太长，优先保证JSON完整性" },
+  "learningAssistantTitle": {
+    "message": "🎓 学习助手",
+    "description": "学习助手侧边栏的标题。"
+  },
+  "assistantPlaceholder": {
+    "message": "请从选项页的书签列表中打开一个学习助手。",
+    "description": "当没有激活书签时，侧边栏中显示的占位符文本。"
+  },
+  "prompt_ask_about_bookmark_in_tab": {
+    "message": "你是一个严谨的AI问答助手。请严格根据下面提供的“上下文”来回答用户的问题。\n\n### 上下文:\n$pageContent$\n\n### 用户的问题:\n$question$\n\n### 你的要求:\n- 你的回答必须完全基于上述“上下文”。\n- 如果“上下文”中没有足够信息来回答问题，请明确指出：“根据所提供的文章内容，无法回答这个问题。”\n- 回答应直接、简洁。",
+    "description": "就书签内容进行提问的提示。",
+    "placeholders": {
+      "pageContent": { "content": "$1" },
+      "question": { "content": "$2" }
+    }
+  },
+  "prompt_generate_quiz_in_tab": {
+    "message": "你是一个优秀的学习导师。请仔细阅读以下“文本内容”，并从中提炼出3到5个最重要的核心知识点，设计成一个学习测验。\n\n### 文本内容:\n$pageContent$\n\n### 你的任务:\n1. 创建3-5个问题，可以是选择题或简答题。\n2. 确保问题能有效检验对文本核心内容的理解。\n3. 返回一个包含 \"quiz\" 列表的JSON对象。每个问题对象应包含 \"question\" (问题), \"type\" (类型: '选择题' 或 '简答题'), \"options\" (选择题选项数组，简答题则为空数组), 和 \"answer\" (答案)。\n\n### JSON格式示例:\n{\"quiz\": [{\"question\": \"React Hooks 的主要目的是什么？\",\"type\": \"选择题\",\"options\": [\"A. 样式化组件\",\"B. 在函数组件中使用 state 和其他 React 特性\",\"C. 路由管理\"],\"answer\": \"B. 在函数组件中使用 state 和其他 React 特性\"}]}\n\n### 关键指令:\n你的回答必须是且仅是一个完整的、语法正确的JSON对象。不要在JSON代码块前后添加任何额外的文字、解释或注释。如果无法根据内容生成有意义的测验，请必须返回一个包含空列表的JSON对象：{\"quiz\": []}",
+    "description": "从书签内容生成测验的提示。",
+    "placeholders": {
+      "pageContent": { "content": "$1" }
+    }
+  },
+  "myFolders": {
+    "message": "我的文件夹",
+    "description": "侧边栏中文件夹区域的标题。"
+  },
+  "smartCategories": {
+    "message": "智能分类",
+    "description": "侧边栏中智能分类区域的标题。"
+  },
+  "continueAnalysis": {
+    "message": "继续分析未完成的书签",
+    "description": "继续分析按钮的工具提示。"
+  },
+  "reanalysis": {
+    "message": "重新分析所有书签",
+    "description": "重新分析按钮的工具提示。"
+  },
+  "smartCategoriesLabel": {
+    "message": "智能分类",
+    "description": "书签列表中智能分类区域的标签。"
+  },
+  "smartCategoryFilter": {
+    "message": "智能分类: ${category}",
+    "description": "按智能分类筛选时的标题。"
+  },
+  "confidenceTooltip": {
+    "message": "AI分类置信度：表示人工智能对这个分类结果的信心程度。85%表示AI有85%的把握认为这个分类是正确的。置信度越高，分类越可靠。",
+    "description": "智能分类置信度徽章的工具提示说明。"
+  },
+  "noSmartCategories": {
+    "message": "暂无智能分类",
+    "description": "智能分类为空时显示的消息。"
+  },
+  "enableSmartCategories": {
+    "message": "启用智能分类",
+    "description": "启用智能分类按钮的文本。"
+  },
+  "smartCategoriesEnabled": {
+    "message": "智能分类已启用",
+    "description": "智能分类启用成功的提示消息。"
+  },
+  "smartCategoriesEnableFailed": {
+    "message": "启用智能分类失败",
+    "description": "智能分类启用失败的提示消息。"
+  },
+  "smartCategoriesComplete": {
+    "message": "智能分类完成！成功分类 ${count} 个书签",
+    "description": "智能分类完成的提示消息。",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "smartCategoriesLoaded": {
+    "message": "智能分类加载完成",
+    "description": "智能分类加载完成的日志消息。"
+  },
+  "smartCategoriesLoadFailed": {
+    "message": "加载智能分类失败",
+    "description": "智能分类加载失败的日志消息。"
+  },
+  "aiConfigRequired": {
+    "message": "请先在设置页面配置AI服务（OpenAI、DeepSeek或OpenRouter）",
+    "description": "需要AI配置的提示消息。"
+  },
+  "showStarredInNewtab": {
+    "message": "在新标签页显示标星书签",
+    "description": "用于启用在新标签页显示标星书签的切换开关标签。"
+  },
+  "noStarredBookmarks": {
+    "message": "暂无标星书签",
+    "description": "没有标星书签时显示的消息。"
+  },
+  "noStarredBookmarksDesc": {
+    "message": "您还没有将任何书签标记为星标",
+    "description": "没有标星书签时的描述消息。"
+  },
+  "loadError": {
+    "message": "加载失败",
+    "description": "加载书签失败时的错误标题。"
+  },
+  "loadErrorDesc": {
+    "message": "无法加载书签数据，请检查扩展设置",
+    "description": "加载书签失败时的错误描述。"
+  },
+  "starredBookmarksHidden": {
+    "message": "标星书签已隐藏",
+    "description": "标星书签被隐藏时显示的消息。"
+  },
+  "starredBookmarksHiddenDesc": {
+    "message": "您已在设置中关闭了\"在新标签页显示标星书签\"选项",
+    "description": "标星书签被隐藏时的描述消息。"
+  },
+  "sendVerificationCode": {
+    "message": "发送验证码",
+    "description": "发送验证码到邮箱的按钮文本。"
+  },
+  "verifyCode": {
+    "message": "验证验证码",
+    "description": "验证验证码的按钮文本。"
+  },
+  "resendCode": {
+    "message": "重新发送验证码",
+    "description": "重新发送验证码的按钮文本。"
+  },
+  "resendCountdown": {
+    "message": "重新发送({seconds}秒)",
+    "description": "倒计时期间重新发送按钮的文本。"
+  },
+  "completeRegistration": {
+    "message": "完成注册",
+    "description": "验证后完成注册的按钮文本。"
+  },
+  "verificationCodePlaceholder": {
+    "message": "请输入6位验证码",
+    "description": "验证码输入框的占位符。"
+  },
+  "confirmPasswordPlaceholder": {
+    "message": "确认密码",
+    "description": "密码确认输入框的占位符。"
+  },
+  "login": {
+    "message": "登录",
+    "description": "用户登录的按钮文本。"
+  },
+  "verificationCodeSent": {
+    "message": "验证码已发送到您的邮箱",
+    "description": "验证码发送后显示的消息。"
+  },
+  "emailVerified": {
+    "message": "邮箱验证成功",
+    "description": "邮箱验证成功后显示的消息。"
+  },
+  "verificationCodeExpired": {
+    "message": "验证码已过期",
+    "description": "验证码过期的错误消息。"
+  },
+  "verificationCodeIncorrect": {
+    "message": "验证码错误",
+    "description": "验证码错误的错误消息。"
+  },
+  "emailAlreadyRegistered": {
+    "message": "邮箱已被注册",
+    "description": "邮箱已被注册时的错误消息。"
+  },
+  "emailNotVerified": {
+    "message": "邮箱未验证，请先验证您的邮箱",
+    "description": "邮箱未验证时的错误消息。"
+  }
+}

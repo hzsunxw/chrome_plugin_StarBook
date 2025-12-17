@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n-title="optionsTitle">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Bookmarker Settings</title>
+  <style>
+    :root {
+      --primary-color: #4285f4;
+      --border-color: #ddd;
+      --bg-color: #f5f5f5;
+      --sidebar-width: 210px;
+    }
+    body {
+      width: 95%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background-color: #fff;
+    }
+    h1 { margin-bottom: 20px; color: #333; }
+    .top-section {
+      margin-bottom: 20px;
+      padding: 20px;
+      border-radius: 8px;
+      background: var(--bg-color);
+    }
+    button {
+      padding: 8px 12px;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+      transition: background-color 0.2s;
+    }
+    button:hover { background: #3367d6; }
+
+    .settings-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #languageSelector {
+      padding: 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+    }
+
+    /*demo新增*/
+    /* 让顶部区域的左右两部分对齐 */
+    .top-section-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap; /* 在小屏幕上换行 */
+        gap: 20px;
+    }
+
+    .settings-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* 账户信息区域 */
+    .account-section {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 10px;
+        border-radius: 8px;
+        min-height: 50px;
+    }
+
+    /* 登录按钮 */
+    #loginBtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background-color: #fff;
+        color: #444;
+        border: 1px solid #ccc;
+        font-weight: 500;
+        padding: 10px 15px;
+    }
+    #loginBtn:hover {
+        background-color: #f8f8f8;
+    }
+    #loginBtn svg {
+        width: 18px;
+        height: 18px;
+    }
+    
+    /* 已登录视图 */
+    #loggedInView {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    /* 用户信息 */
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .user-info img {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .user-details {
+        display: flex;
+        flex-direction: column;
+    }
+    .user-details .name {
+        font-weight: 600;
+        color: #333;
+    }
+    .user-details .email {
+        font-size: 12px;
+        color: #666;
+    }
+
+    /* 同步状态 */
+    .sync-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+    .sync-status .icon {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* 不同状态的颜色和图标 */
+    .sync-status .sync-synced { color: #2e7d32; }
+    .sync-status .sync-syncing { color: #1565c0; }
+    .sync-status .sync-error { color: #c62828; }
+
+    /* 同步中图标的旋转动画 */
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    .sync-syncing .icon {
+        animation: spin 1.5s linear infinite;
+    }
+    
+    /* 退出登录按钮 */
+    #logoutBtn {
+        background: none;
+        color: #666;
+        font-size: 12px;
+        text-decoration: underline;
+        padding: 5px;
+        margin-left: 10px;
+    }
+    #logoutBtn:hover {
+        background: none;
+        color: #333;
+    }
+
+    /* ... 此处省略所有 CSS，请使用上一个回答中提供的完整 CSS ... */
+    /* 为了让新按钮样式生效，增加以下样式 */
+    .login-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background-color: #fff;
+        color: #444;
+        border: 1px solid #ccc;
+        font-weight: 500;
+        padding: 10px 15px;
+        margin: 5px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+    }
+    .login-btn:hover { background-color: #f8f8f8; }
+    .login-btn svg { width: 18px; height: 18px; }
+    .login-btn.github { color: #fff; background-color: #333; }
+    .login-btn.github:hover { background-color: #444; }
+    .social-login-btn[data-provider="wechat"] { color: #fff; background-color: #07c160; }
+    .social-login-btn[data-provider="wechat"]:hover { background-color: #06a652; }
+    #regionSelectionView p, #loggedOutView p { text-align: center; color: #666; margin-bottom: 10px;}
+
+    /* 默认隐藏某些元素 */
+    .hidden {
+        display: none !important;
+    }
+
+        /* 统一的登录/注册按钮 */
+        #showLoginModalBtn {
+            font-weight: 600;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+        }
+        #showLoginModalBtn:hover {
+            background-color: #3367d6;
+        }
+
+        /* 登录弹窗蒙层 */
+        .login-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        /* 登录弹窗容器 */
+        .login-modal-container {
+            background: white;
+            padding: 30px 40px;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            text-align: center;
+            position: relative;
+        }
+
+        /* 弹窗关闭按钮 */
+        .login-modal-close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 28px;
+            color: #aaa;
+            border: none;
+            background: none;
+            cursor: pointer;
+        }
+        .login-modal-close:hover { color: #333; }
+
+        .login-modal-container h2 {
+            margin-top: 0;
+            margin-bottom: 25px;
+            color: #333;
+        }
+
+        /* 输入框样式 */
+        .input-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box; /* 保证 padding 不会撑大宽度 */
+        }
+        
+        /* 主操作按钮 (邮箱登录) */
+        .primary-login-btn {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            background-color: #e50914; /* 参考 Netflix 红色 */
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .primary-login-btn:hover {
+            background-color: #f6121D;
+        }
+        
+        /* 分隔线 "--或--" */
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: #aaa;
+            margin: 25px 0;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #ddd;
+        }
+        .divider:not(:empty)::before { margin-right: .5em; }
+        .divider:not(:empty)::after { margin-left: .5em; }
+
+        /* 第三方登录按钮 */
+        .social-login-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            background-color: white;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .social-login-btn:hover { background-color: #f8f8f8; }
+        .social-login-btn svg {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+        }
+
+        /* 验证步骤样式 */
+        .verification-step {
+            transition: all 0.3s ease;
+        }
+        .verification-message {
+            font-size: 14px;
+            margin: 10px 0;
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+        .verification-message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .verification-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .verification-message.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .secondary-btn {
+            background: none;
+            border: 1px solid #ccc;
+            color: #666;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .secondary-btn:hover {
+            background-color: #f8f8f8;
+        }
+
+        /* 界面切换按钮样式 */
+        .switch-auth-mode {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+        }
+        .link-btn {
+            background: none;
+            border: none;
+            color: #4285f4;
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 14px;
+            padding: 0;
+            margin-left: 5px;
+        }
+        .link-btn:hover {
+            color: #3367d6;
+        }
+
+    /*demo新增完成*/
+
+    /* Main Layout */
+    .main-container {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    .sidebar {
+      width: var(--sidebar-width);
+      flex-shrink: 0;
+      background: var(--bg-color);
+      border-radius: 8px;
+      padding: 15px;
+      overflow-y: auto;
+      height: calc(100vh - 250px);
+    }
+    .content {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0; 
+    }
+    .content-header {
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    #searchInput {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .bookmark-list-container {
+      /* No height limit, will expand naturally */
+    }
+
+    /* Folder Tree Styles */
+    .folder-tree ul {
+      list-style: none;
+      padding-left: 10px; /* Reduced from 20px */
+    }
+    .folder-tree li {
+      padding: 4px 0;
+    }
+    .tree-item {
+      display: flex;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tree-item:hover {
+      background-color: #e0e0e0;
+    }
+    .tree-item.active {
+      background-color: var(--primary-color);
+      color: white;
+    }
+    .tree-item .icon {
+      margin-right: 8px;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+    .tree-item .icon.toggle {
+      transition: transform 0.2s;
+    }
+    .tree-item.collapsed .icon.toggle {
+      transform: rotate(-90deg);
+    }
+    .tree-item-children {
+        display: block;
+    }
+    .tree-item.collapsed + .tree-item-children {
+        display: none;
+    }
+
+    /* === 智能分类样式 === */
+    .smart-category-section {
+      margin-top: 20px;
+      border-top: 1px solid #e0e0e0;
+      padding-top: 15px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .section-header:hover {
+      background: #e9ecef;
+    }
+
+    .section-header .icon {
+      font-size: 16px;
+      margin-right: 8px;
+    }
+
+    .section-header .title {
+      font-weight: 600;
+      color: #333;
+      flex: 1;
+    }
+
+    .section-header .toggle-icon {
+      font-size: 12px;
+      color: #666;
+      transition: transform 0.2s;
+    }
+
+    .section-header.collapsed .toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    .section-actions {
+      display: flex;
+      gap: 5px;
+    }
+
+    .icon-btn {
+      background: none;
+      border: none;
+      padding: 4px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+      transition: all 0.2s;
+    }
+
+    .icon-btn:hover {
+      background: #e9ecef;
+      color: #333;
+    }
+
+    .section-content {
+      transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+      overflow: hidden;
+    }
+
+    .section-content.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
+
+    .category-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      margin: 2px 0;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+
+    .category-item:hover {
+      background: #f0f8ff;
+    }
+
+    .category-item.active {
+      background: #e3f2fd;
+      border-left: 3px solid #2196f3;
+      font-weight: 500;
+    }
+
+    .category-name {
+      color: #555;
+      flex: 1;
+    }
+
+    .category-count {
+      color: #888;
+      font-size: 12px;
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: 8px;
+    }
+
+    .progress-container {
+      margin: 15px 0;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      border: 1px solid #e9ecef;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: #e0e0e0;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4caf50, #8bc34a);
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    .progress-text {
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 20px;
+      color: #888;
+    }
+
+    .empty-state p {
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+
+    .btn-primary {
+      background: #2196f3;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: #1976d2;
+    }
+
+    /* Bookmark Item Styles */
+    .bookmark-item {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      background: white;
+      transition: box-shadow 0.2s ease;
+    }
+    
+    .bookmark-item:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* 书签头部布局 */
+    .bookmark-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    
+    .favicon {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+    
+    .bookmark-title {
+      flex: 1;
+      font-weight: 600;
+      color: #1a73e8;
+      cursor: pointer;
+      text-decoration: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .bookmark-title:hover {
+      text-decoration: underline;
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+    
+    .action-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px 10px;
+      border-radius: 4px;
+      font-size: 18px;
+      transition: background-color 0.2s;
+      min-width: 36px;
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .action-btn:hover {
+      background-color: #f0f0f0;
+    }
+    
+    .action-btn.star.starred {
+      color: #ffa000;
+    }
+    
+    .action-btn.delete-btn {
+      color: #d32f2f;
+      font-size: 20px;
+      min-width: 40px;
+      min-height: 40px;
+      padding: 10px;
+    }
+    
+    .action-btn.regenerate-btn {
+      color: #1976d2;
+    }
+    
+    /* URL显示 */
+    .bookmark-url {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 8px;
+      word-break: break-all;
+      line-height: 1.3;
+    }
+    
+    /* 摘要样式 */
+    .bookmark-summary {
+      background: #f8f9fa;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      line-height: 1.4;
+      color: #444;
+      margin: 8px 0;
+      border-left: 3px solid #4285f4;
+    }
+    
+    /* 分类样式 */
+    .bookmark-category {
+      display: inline-block;
+      background: #e8f0fe;
+      color: #1565c0;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      margin: 5px 0;
+    }
+    
+    /* 标签云样式 */
+    .bookmark-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin: 8px 0;
+    }
+    
+    .tag {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 12px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+      text-decoration: none;
+    }
+    
+    .tag:hover {
+      transform: scale(1.05);
+    }
+
+    /* 智能分类样式 */
+    .bookmark-smart-categories {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin: 8px 0;
+      padding: 8px;
+      background: linear-gradient(135deg, #f8f9ff 0%, #e8f4fd 100%);
+      border-radius: 8px;
+      border-left: 4px solid #4caf50;
+    }
+
+    .smart-categories-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #2e7d32;
+      margin-right: 4px;
+    }
+
+    .smart-category {
+      background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+      color: white;
+      border-radius: 14px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      box-shadow: 0 1px 3px rgba(76, 175, 80, 0.2);
+    }
+
+    .smart-category:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(76, 175, 80, 0.4);
+      background: linear-gradient(135deg, #66bb6a 0%, #388e3c 100%);
+    }
+
+    .confidence-badge {
+      background: #ff9800;
+      color: white;
+      border-radius: 10px;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 600;
+      margin-left: 4px;
+      cursor: help;
+    }
+
+    /* 增强信息容器 */
+    .bookmark-enhanced-info {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      font-size: 12px;
+      border-left: 3px solid #4285f4;
+    }
+    
+    .info-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+      gap: 8px;
+    }
+    
+    .info-row:last-child {
+      margin-bottom: 0;
+    }
+    
+    .info-label {
+      font-weight: 600;
+      color: #444;
+      min-width: 80px;
+      flex-shrink: 0;
+    }
+    
+    .info-value {
+      color: #666;
+      flex: 1;
+    }
+    
+    /* 内容类型和阅读难度标签 */
+    .content-type-badge, .reading-level-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-right: 6px;
+    }
+    
+    .content-type-badge {
+      background: #e8f5e8;
+      color: #2e7d32;
+    }
+    
+    .reading-level-badge.beginner {
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+    
+    .reading-level-badge.intermediate {
+      background: #fff3e0;
+      color: #ef6c00;
+    }
+    
+    .reading-level-badge.advanced {
+      background: #fce4ec;
+      color: #c2185b;
+    }
+    
+    /* 阅读时间样式 */
+    .read-time {
+      color: #666;
+      font-size: 11px;
+      font-style: italic;
+    }
+    
+    /* 关键点样式 */
+    .key-points {
+      margin-top: 10px;
+    }
+    
+    .key-points-title {
+      font-weight: 600;
+      color: #444;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+    
+    .key-points-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .key-point {
+      background: #e3f2fd;
+      margin: 4px 0;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #1565c0;
+      position: relative;
+      padding-left: 20px;
+      line-height: 1.3;
+    }
+    
+    .key-point::before {
+      content: "•";
+      color: #1976d2;
+      font-weight: bold;
+      position: absolute;
+      left: 8px;
+      top: 6px;
+    }
+    
+    /* 情感分析颜色 */
+    .sentiment-positive { 
+      color: #4caf50; 
+      font-weight: 500;
+    }
+    .sentiment-negative { 
+      color: #f44336; 
+      font-weight: 500;
+    }
+    .sentiment-neutral { 
+      color: #757575; 
+    }
+    
+    /* AI状态显示 */
+    .ai-status {
+      padding: 8px 10px;
+      background: #fff3e0;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #ef6c00;
+      margin: 8px 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    /* 空状态样式 */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #666;
+      font-style: italic;
+    }
+    
+    /* 面包屑样式 */
+    .breadcrumb {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+      font-weight: 500;
+    }
+    
+    /* 响应式调整 */
+    @media (max-width: 768px) {
+      .bookmark-header {
+        flex-wrap: wrap;
+      }
+      
+      .bookmark-title {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: initial;
+      }
+      
+      .action-buttons {
+        order: 3;
+        width: 100%;
+        justify-content: flex-end;
+        margin-top: 5px;
+      }
+      
+      .info-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+      }
+      
+      .info-label {
+        min-width: auto;
+      }
+    }
+    .clickable { cursor: pointer; color: var(--primary-color); }
+    .clickable:hover { text-decoration: underline; }
+    .bookmark-date { font-size: 11px; color: #999; margin-top: 3px; }
+    .star { color: #ccc; cursor: pointer; margin: 0 10px; font-size: 18px; }
+    .star.starred { color: gold; }
+    .actions { display: flex; align-items: center; }
+    .empty-state { text-align: center; padding: 40px; color: #999; }
+    .breadcrumb { font-size: 12px; color: #666; margin-bottom: 10px; }
+    
+    /* AI Config Modal */
+    #aiConfigSection { display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+    .config-modal { background: white; padding: 20px; border-radius: 8px; width: 500px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+    .config-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .close-btn { background: none; color: #666; border: none; font-size: 24px; cursor: pointer; }
+    .input-group { display: flex; align-items: center; margin-bottom: 10px; }
+    .input-group label { width: 130px; text-align: right; margin-right: 10px; }
+    .input-group input, .input-group select { flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; }
+
+    /* 新标签页切换开关样式 */
+    .toggle-switch-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 15px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .toggle-slider {
+      background-color: #2196F3;
+    }
+
+    input:checked + .toggle-slider:before {
+      transform: translateX(26px);
+    }
+
+    .toggle-label {
+      font-size: 14px;
+      color: #333;
+    }
+
+    /* Context Menu */
+    .context-menu {
+      display: none;
+      position: absolute;
+      background-color: white;
+      border: 1px solid var(--border-color);
+      border-radius: 5px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+      padding: 5px 0;
+      min-width: 150px;
+    }
+    .context-menu ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .context-menu li {
+      padding: 8px 15px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .context-menu li:hover {
+      background-color: var(--bg-color);
+    }
+
+    /* --- 备注功能样式 (已更新) --- */
+    /* 备注按钮 SVG 的默认样式 (无备注时) */
+    .action-btn.notes-btn svg {
+      fill: #BDBDBD; /* 灰色 */
+      transition: fill 0.2s;
+    }
+
+    /* 备注按钮悬停时 SVG 的样式 (无备注时) */
+    .action-btn.notes-btn:hover svg {
+      fill: #9E9E9E;
+    }
+
+    /* 当按钮有 .has-notes 类时 (有备注时) SVG 的样式 */
+    .action-btn.notes-btn.has-notes svg {
+      fill: #f57f17; /* 琥珀色 */
+    }
+    
+    /* 当按钮有 .has-notes 类时悬停的样式 */
+    .action-btn.notes-btn.has-notes:hover svg {
+      fill: #ff9800;
+    }
+
+    .notes-section {
+      display: none; /* 默认隐藏 */
+      margin-top: 12px;
+      padding: 12px;
+      background-color: #fffde7; /* 淡黄色背景，提示敏感信息 */
+      border-left: 4px solid #fbc02d;
+      border-radius: 4px;
+    }
+
+    .notes-section textarea {
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 70px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 8px;
+      font-family: inherit;
+      resize: vertical;
+    }
+
+    .notes-actions {
+      margin-top: 8px;
+      text-align: right;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .notes-actions button {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .notes-actions .save-notes-btn {
+      background-color: #4CAF50; /* 绿色保存按钮 */
+    }
+    .notes-actions .save-notes-btn:hover {
+      background-color: #45a049;
+    }
+    .notes-actions .cancel-notes-btn {
+      background-color: #757575; /* 灰色取消按钮 */
+    }
+    .notes-actions .cancel-notes-btn:hover {
+      background-color: #616161;
+    }
+    /* 用于包裹输入框和其下方的帮助文本 */
+    .form-row {
+      margin-bottom: 10px;
+    }
+
+    /* 让原来的 input-group 不再有底部边距，由 .form-row 控制 */
+    .form-row .input-group {
+      margin-bottom: 0;
+    }
+
+    /* 帮助文本容器的样式 */
+    .help-text-container {
+      /* 关键：通过左边距让帮助文本与上方的输入框左侧对齐 */
+      /* 计算方式：label宽度(130px) + label右边距(10px) = 140px */
+      padding-left: 140px; 
+      margin-top: 5px; /* 与上方输入框的间距 */
+    }
+    
+    /* 帮助文本本身的样式 */
+    .help-text-container .help-text {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.4;
+    }  
+  </style>
+</head>
+<body>
+  <h1 data-i18n="optionsTitle"></h1>
+  
+ <div class="top-section">
+      <div class="top-section-content">
+          <div class="settings-bar">
+              <div>
+                  <button id="importBookmarks" data-i18n="importBookmarks">Import Bookmarks</button>
+                  <button id="toggleAIConfig" data-i18n="aiConfig">AI Settings</button>
+                  <button id="restartAiTasksBtn" data-i18n="restartAiTasks" data-i18n-title="restartAiTasksTooltip"></button>
+                  <button id="toggleQA" data-i18n="qaSystem">Q&A System</button>
+              </div>
+              <div class="toggle-switch-container">
+                  <label class="toggle-switch">
+                      <input type="checkbox" id="newtabToggle">
+                      <span class="toggle-slider"></span>
+                  </label>
+                  <span class="toggle-label" data-i18n="showStarredInNewtab">在新标签页中显示标星书签</span>
+              </div>
+              <select id="languageSelector">
+                  <option value="en" data-i18n="langEnglish"></option>
+                  <option value="zh_CN" data-i18n="langChinese"></option>
+              </select>
+          </div>
+
+          <div class="account-section">
+              <div id="loggedOutView">
+                  <button id="showLoginModalBtn" data-i18n="loginOrRegister"></button>
+              </div>
+
+              <div id="loggedInView" class="hidden">
+                  <div class="user-info">
+                      <img id="userAvatar" src="" alt="User Avatar">
+                      <div class="user-details">
+                          <span id="userName" class="name"></span>
+                          <span id="userEmail" class="email"></span>
+                      </div>
+                  </div>
+                  <button id="logoutBtn" data-i18n="logout"></button>
+              </div>
+          </div>
+
+        </div>
+  </div>
+
+  <div class="main-container">
+    <div class="sidebar" id="folder-tree-container">
+      <!-- 现有文件夹部分 -->
+      <div class="folder-section">
+        <div class="section-header" id="folders-header">
+          <span class="icon">📂</span>
+          <span class="title" data-i18n="myFolders">我的文件夹</span>
+          <span class="toggle-icon">▶</span>
+        </div>
+        <div id="folders-content" class="section-content collapsed">
+          <div class="folder-tree" id="folderTree">
+            <!-- Folder tree will be populated by JavaScript -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 智能分类部分 -->
+      <div class="smart-category-section">
+        <div class="section-header">
+          <span class="icon">✨</span>
+          <span class="title" data-i18n="smartCategories">智能分类</span>
+          <div class="section-actions">
+            <button id="continueAnalysisBtn" class="icon-btn" data-i18n-title="continueAnalysis">▶️</button>
+            <button id="reanalysisBtn" class="icon-btn" data-i18n-title="reanalysis">🔄</button>
+          </div>
+        </div>
+
+        <!-- 批量分类进度条 -->
+        <div id="classification-progress" class="progress-container" style="display: none;">
+          <div class="progress-bar">
+            <div class="progress-fill"></div>
+          </div>
+          <div class="progress-text">
+            <span data-i18n="classifying">正在智能分类...</span>
+            <span id="progress-count">0/0</span>
+          </div>
+        </div>
+
+        <div id="smart-categories-content" class="section-content">
+          <!-- 动态生成的智能分类列表 -->
+        </div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="content-header">
+        <input type="search" id="searchInput" data-i18n-placeholder="searchPlaceholder">
+      </div>
+      <div class="bookmark-list-container" id="bookmark-list-container">
+        </div>
+    </div>
+  </div>
+
+  <div id="aiConfigSection">
+    <div class="config-modal">
+      <div class="config-header">
+        <h2 data-i18n="aiConfig"></h2>
+        <button id="closeAIConfig" class="close-btn" data-i18n-title="close" title="Close">&times;</button>
+      </div>
+      <div class="config-form">
+        <div class="input-group">
+          <label for="aiProvider" data-i18n="aiProvider"></label>
+          <select id="aiProvider">
+            <option value="openai">OpenAI</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="openrouter">OpenRouter</option>
+          </select>
+        </div>
+        
+        <div class="form-row">
+          <div class="input-group">
+            <label for="aiAnalysisDepth" data-i18n="analysisDepth"></label>
+            <select id="aiAnalysisDepth">
+              <option value="basic" data-i18n="analysisDepthBasic"></option>
+              <option value="standard" data-i18n="analysisDepthStandard"></option>
+              <option value="detailed" data-i18n="analysisDepthDetailed"></option>
+            </select>
+          </div>
+          <div class="help-text-container">
+            <small class="help-text" data-i18n="analysisDepthHelp"></small>
+          </div>
+        </div>
+
+        <div id="openaiConfig">
+          <div class="input-group">
+            <label for="openaiKey" data-i18n="apiKey"></label>
+            <input type="password" id="openaiKey" placeholder="sk-xxxxxxxxxxxxxxxx">
+          </div>
+          <div class="input-group">
+            <label for="openaiModel" data-i18n="model"></label>
+            <select id="openaiModel">
+              <option value="gpt-4o">GPT-4o</option>
+              <option value="gpt-4-turbo">GPT-4 Turbo</option>
+              <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+            </select>
+          </div>
+        </div>
+        <div id="deepseekConfig" style="display:none">
+          <div class="input-group">
+            <label for="deepseekKey" data-i18n="apiKey"></label>
+            <input type="password" id="deepseekKey" placeholder="sk-xxxxxxxxxxxxxxxx">
+          </div>
+          <div class="input-group">
+            <label for="deepseekModel" data-i18n="model"></label>
+            <select id="deepseekModel">
+              <option value="deepseek-chat">DeepSeek Chat</option>
+              <option value="deepseek-coder">DeepSeek Coder</option>
+            </select>
+          </div>
+        </div>
+        <div id="openrouterConfig" style="display:none">
+          <div class="input-group">
+            <label for="openrouterKey" data-i18n="apiKey"></label>
+            <input type="password" id="openrouterKey" placeholder="sk-or-v1-xxxxxxxxxxxxxxxx">
+          </div>
+          <div class="input-group">
+            <label for="openrouterModel" data-i18n="model"></label>
+            <input type="text" id="openrouterModel" placeholder="google/gemini-flash-1.5">
+          </div>
+        </div>
+        <div class="input-group" style="justify-content: flex-end; margin-top: 15px;">
+          <button id="saveAIConfig" data-i18n="saveConfig"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="qaSection" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div class="config-modal">
+      <div class="config-header">
+        <h2 data-i18n="qaSystem"></h2>
+        <button id="closeQA" class="close-btn" data-i18n-title="close" title="Close">&times;</button>
+      </div>
+      <div class="config-form">
+        <div class="input-group">
+          <label data-i18n="qaQuestionLabel"></label>
+          <textarea id="questionInput" data-i18n-placeholder="questionPlaceholder" rows="3" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+        </div>
+        <div class="input-group" style="justify-content: flex-end;">
+          <button id="askQuestion" data-i18n="askQuestion"></button>
+        </div>
+        <div class="qa-info" style="margin-top: 15px; padding: 15px; background: #f0f8ff; border-radius: 8px; font-size: 14px; min-height: 100px;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="notesEditModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div class="config-modal" style="width: 600px;">
+      <div class="config-header">
+        <h2 data-i18n="editNotes">Edit Notes</h2>
+        <button id="closeNotesModal" class="close-btn" title="Close">&times;</button>
+      </div>
+      <div class="config-form">
+        <p id="notesEditTitle" style="font-weight: bold; margin-bottom: 10px;"></p>
+        <textarea id="notesEditTextarea" style="width: 100%; min-height: 150px; box-sizing: border-box; padding: 8px; font-family: inherit; resize: vertical; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+        <div style="text-align: right; margin-top: 15px;">
+          <button id="saveNotesBtn" data-i18n="save" style="background-color: #4CAF50;"></button>
+          <button id="cancelNotesBtn" data-i18n="cancel" style="background-color: #757575;"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="loginModal" class="login-modal-overlay hidden">
+      <div class="login-modal-container">
+          <button id="closeLoginModalBtn" class="login-modal-close">&times;</button>
+          <h2 data-i18n="loginModalTitle"></h2>
+
+          <!-- 登录界面 -->
+          <div id="loginSection" class="login-section">
+              <div class="input-group">
+                  <input type="email" id="emailInput" data-i18n-placeholder="emailPlaceholder">
+              </div>
+              <div class="input-group">
+                  <input type="password" id="passwordInput" data-i18n-placeholder="passwordPlaceholder">
+              </div>
+              <button id="loginBtn" class="primary-login-btn" data-i18n="login"></button>
+              <p id="loginMessage" class="verification-message hidden"></p>
+              <div class="switch-auth-mode">
+                  <span>没有账号？</span>
+                  <button id="switchToRegisterBtn" class="link-btn">注册</button>
+              </div>
+          </div>
+
+          <!-- 注册界面 -->
+          <div id="registerSection" class="register-section hidden">
+              <!-- 步骤1: 邮箱输入和验证码发送 -->
+              <div id="step1" class="verification-step">
+                  <div class="input-group">
+                      <input type="email" id="registerEmailInput" data-i18n-placeholder="emailPlaceholder">
+                  </div>
+                  <button id="sendVerificationCodeBtn" class="primary-login-btn" data-i18n="sendVerificationCode"></button>
+                  <p id="verificationMessage" class="verification-message hidden"></p>
+              </div>
+
+              <!-- 步骤2: 验证码输入 -->
+              <div id="step2" class="verification-step hidden">
+                  <div class="input-group">
+                      <input type="text" id="verificationCodeInput" data-i18n-placeholder="verificationCodePlaceholder" maxlength="6">
+                  </div>
+                  <button id="verifyCodeBtn" class="primary-login-btn" data-i18n="verifyCode"></button>
+                  <p id="verificationStatus" class="verification-message"></p>
+                  <button id="resendCodeBtn" class="secondary-btn" data-i18n="resendCode"></button>
+              </div>
+
+              <!-- 步骤3: 密码设置 -->
+              <div id="step3" class="verification-step hidden">
+                  <div class="input-group">
+                      <input type="password" id="registerPasswordInput" data-i18n-placeholder="passwordPlaceholder">
+                  </div>
+                  <div class="input-group">
+                      <input type="password" id="confirmPasswordInput" data-i18n-placeholder="confirmPasswordPlaceholder">
+                  </div>
+                  <button id="completeRegistrationBtn" class="primary-login-btn" data-i18n="completeRegistration"></button>
+              </div>
+
+              <div class="switch-auth-mode">
+                  <span>已有账号？</span>
+                  <button id="switchToLoginBtn" class="link-btn">登录</button>
+              </div>
+          </div>
+
+          <div class="divider" data-i18n="orDivider"></div>
+
+          <button class="social-login-btn" data-provider="google">
+              <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C42.022,36.218,44,30.668,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
+              <span data-i18n="loginWithGoogle"></span>
+          </button>
+          <button class="social-login-btn" data-provider="github">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.91 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.565 21.795 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+              <span data-i18n="loginWithGithub"></span>
+          </button>
+          <button class="social-login-btn" data-provider="wechat">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.5,4C5.4,4,2,6.9,2,10.5c0,1.7,0.8,3.3,2.1,4.4c0,0.1,0,0.2,0,0.3l-0.5,1.9l2-0.6c0.2,0,0.3,0,0.5,0c4.1,0,7.5-2.9,7.5-6.5S13.6,4,9.5,4z M6.8,8.8C6.4,8.8,6.1,8.5,6.1,8.1s0.3-0.8,0.8-0.8s0.8,0.3,0.8,0.8S7.3,8.8,6.8,8.8z M12.2,8.8c-0.5,0-0.8-0.3-0.8-0.8s0.3-0.8,0.8-0.8s0.8,0.3,0.8,0.8S12.7,8.8,12.2,8.8z"/><path d="M14.5,20c4.1,0,7.5-2.9,7.5-6.5S18.6,7,14.5,7S7,9.9,7,13.5c0,1.7,0.8,3.3,2.1,4.4c0,0.1,0,0.2,0,0.3l-0.5,1.9l2-0.6c0.2,0,0.3,0,0.5,0c0,0,0,0,0,0c0.1,0,0.3,0,0.4,0C12.5,19.7,13.5,20,14.5,20z M11.8,15.2c-0.5,0-0.8-0.3-0.8-0.8s0.3-0.8,0.8-0.8s0.8,0.3,0.8,0.8S12.3,15.2,11.8,15.2z M17.2,15.2c-0.5,0-0.8-0.3-0.8-0.8s0.3-0.8,0.8-0.8s0.8,0.3,0.8,0.8S17.7,15.2,17.2,15.2z"/></svg>
+              <span data-i18n="loginWithWechat"></span>
+          </button>
+      </div>
+  </div>
+
+  <div id="folder-context-menu" class="context-menu">
+    <ul>
+      <li id="delete-folder-btn" data-i18n="deleteFolder"></li>
+    </ul>
+  </div>
+
+<div id="loadingOverlay" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; color: white;">
+  <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
+  <p id="loadingMessage" style="margin-top: 20px;" data-i18n="importingBookmarks"></p>
+  <p id="progressMessage" style="margin-top: 10px; font-size: 14px;"></p> <!-- 用于显示进度 -->
+</div>
+
+  <script src="i18n.js"></script>
+  <script type="module" src="browser-adapter.js"></script>
+  <script src="options.js"></script>
+
+</body>
+</html>
